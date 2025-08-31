@@ -18,6 +18,8 @@ func main() {
 		log.Println("⚠️ Aviso: arquivo .env não encontrado, usando variáveis do sistema")
 	}
 
+	mux := http.NewServeMux()
+
 	// Conectar ao banco PostgreSQL
 	config.ConnectDB()
 
@@ -28,21 +30,22 @@ func main() {
 	}
 
 	// Rota raiz
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "🚀 API Marca-Ai rodando com Go e PostgreSQL!")
 	})
 
 	// Rota de healthcheck
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "OK")
 	})
 
 	// Adicione esta linha para a rota de cadastro
-	mux := http.NewServeMux()
-	mux.HandleFunc("/register-dono-de-arena", handlers.RegisterUsuarioHandler)
-	mux.HandleFunc("/register-usuario", handlers.RegisterDonodeArenaHandler)
+
+	mux.HandleFunc("/register-usuario", handlers.RegisterUsuarioHandler)
+	mux.HandleFunc("/register-dono-de-arena", handlers.RegisterDonodeArenaHandler)
+	mux.HandleFunc("/login", handlers.LoginHandler)
 
 	log.Printf("Servidor rodando em http://localhost:%s\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	log.Fatal(http.ListenAndServe(":"+port, mux))
 }

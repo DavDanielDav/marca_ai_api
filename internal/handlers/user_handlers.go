@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -104,4 +105,38 @@ func RegisterDonodeArenaHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Dono de Arena registrado com sucesso"})
+}
+
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	email := r.URL.Query().Get("email")
+	// password := r.URL.Query().Get("password") // Password should not be sent in production code
+
+	if strings.TrimSpace(email) == "" {
+		http.Error(w, "Email is required", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Add database logic to verify user credentials
+	log.Printf("Login attempt for email: %s", email)
+
+	var userEmail string
+	err := config.DB.QueryRow("SELECT email FROM cadastro WHERE email = $1", email).Scan(&userEmail)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error querying database: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Login successful"})
 }
