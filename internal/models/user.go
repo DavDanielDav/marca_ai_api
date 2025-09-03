@@ -1,6 +1,6 @@
 package models
 
-// Representa um usuário comum
+// Jogador
 type Usuario struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
@@ -8,7 +8,7 @@ type Usuario struct {
 	// Password string `json:"password"` // futuro, se quiser
 }
 
-// Representa um dono de arena
+// Dono de arena
 type DonoDeArena struct {
 	NomeDonoArena string `json:"nome_dono_arena"`
 	Cnpj          string `json:"cnpj"`

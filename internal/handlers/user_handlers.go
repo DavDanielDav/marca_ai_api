@@ -121,7 +121,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Add database logic to verify user credentials
 	log.Printf("Login attempt for email: %s", email)
 
 	var userEmail string
