@@ -5,7 +5,7 @@ type Usuario struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Telefone string `json:"telefone"`
-	// Password string `json:"password"` // futuro, se quiser
+	Senha    string `json:"-"`
 }
 
 // Dono de arena

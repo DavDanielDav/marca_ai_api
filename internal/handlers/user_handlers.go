@@ -9,6 +9,7 @@ import (
 
 	"github.com/danpi/marca_ai_backend/internal/config"
 	"github.com/danpi/marca_ai_backend/internal/models"
+	"github.com/danpi/marca_ai_backend/internal/utils"
 )
 
 func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
@@ -28,26 +29,33 @@ func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	//lógica de inserção no banco de dados aqui
 
 	if strings.TrimSpace(newUser.Username) == "" {
-		http.Error(w, "Nome is required", http.StatusBadRequest)
+		http.Error(w, "Requer Nome", http.StatusBadRequest)
 		return
 	}
 	if strings.TrimSpace(newUser.Email) == "" {
-		http.Error(w, "Email is required", http.StatusBadRequest)
+		http.Error(w, "Requer Email", http.StatusBadRequest)
 		return
 	}
-	//if strings.TrimSpace(newUser.password) == "" {
-	//http.Error(w, "passaword is required", http.StatusBadRequest)
-	//return
-	//}
+	if strings.TrimSpace(newUser.Senha) == "" {
+		http.Error(w, "passaword is required", http.StatusBadRequest)
+		return
+	}
 	if strings.TrimSpace(newUser.Telefone) == "" {
 		http.Error(w, "passaword is required", http.StatusBadRequest)
 		return
 	}
+
+	_, err = utils.HashSenha(newUser.Senha)
+	if err != nil {
+		http.Error(w, "Erro ao processar senha", http.StatusInternalServerError)
+		return
+	}
+
 	_, err = config.DB.Exec(
-		"INSERT INTO cadastro (nome, email, telefone) VALUES ($1, $2, $3)",
-		newUser.Username, newUser.Email, newUser.Telefone, // TODO: Hash da senha antes de salvar!
+		"INSERT INTO cadastro (nome, email, telefone, senha) VALUES ($1, $2, $3, $4)",
+		newUser.Username, newUser.Email, newUser.Telefone, newUser.Senha,
 	)
-	//apos adicionar coluna passaword(senha) no banco, adicionar no insert dado password
+
 	if err != nil {
 		log.Printf("Erro ao inserir usuario no banco: %v", err)
 		http.Error(w, "Erro ao registrar usuario", http.StatusInternalServerError)
@@ -114,7 +122,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	email := r.URL.Query().Get("email")
-	// password := r.URL.Query().Get("password") // Password should not be sent in production code
+	senha := r.URL.Query().Get("senha")
 
 	if strings.TrimSpace(email) == "" {
 		http.Error(w, "Email is required", http.StatusBadRequest)
@@ -132,6 +140,12 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("Error querying database: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	hashedSenha := ""
+	if !utils.CheckSenhaHash(senha, hashedSenha) {
+		http.Error(w, "Senha incorreta", http.StatusUnauthorized)
 		return
 	}
 
