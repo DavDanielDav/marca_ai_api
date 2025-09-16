@@ -26,8 +26,8 @@ func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("Dados de cadastro recebidos: %+v", newUser)
-	//lógica de inserção no banco de dados aqui
 
+	// Validações
 	if strings.TrimSpace(newUser.Username) == "" {
 		http.Error(w, "Requer Nome", http.StatusBadRequest)
 		return
@@ -37,25 +37,26 @@ func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.TrimSpace(newUser.Senha) == "" {
-		http.Error(w, "passaword is required", http.StatusBadRequest)
+		http.Error(w, "Password is required", http.StatusBadRequest)
 		return
 	}
 	if strings.TrimSpace(newUser.Telefone) == "" {
-		http.Error(w, "passaword is required", http.StatusBadRequest)
+		http.Error(w, "Telefone is required", http.StatusBadRequest)
 		return
 	}
 
-	_, err = utils.HashSenha(newUser.Senha)
+	// Gera o hash da senha
+	hashedPassword, err := utils.HashSenha(newUser.Senha)
 	if err != nil {
 		http.Error(w, "Erro ao processar senha", http.StatusInternalServerError)
 		return
 	}
 
+	// Salva no banco já com hash
 	_, err = config.DB.Exec(
-		"INSERT INTO cadastro (nome, email, telefone, senha) VALUES ($1, $2, $3, $4)",
-		newUser.Username, newUser.Email, newUser.Telefone, newUser.Senha,
+		"INSERT INTO usuario (nome, email, telefone, senha) VALUES ($1, $2, $3, $4)",
+		newUser.Username, newUser.Email, newUser.Telefone, hashedPassword,
 	)
-
 	if err != nil {
 		log.Printf("Erro ao inserir usuario no banco: %v", err)
 		http.Error(w, "Erro ao registrar usuario", http.StatusInternalServerError)
@@ -64,8 +65,11 @@ func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Usuario inserido no banco de dados com sucesso!")
 
+	// Limpa senha antes de retornar a resposta
+	newUser.Senha = ""
+
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Usuario registrado com sucesso"})
 }
 
@@ -116,23 +120,31 @@ func RegisterDonodeArenaHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
+	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	email := r.URL.Query().Get("email")
-	senha := r.URL.Query().Get("senha")
-
-	if strings.TrimSpace(email) == "" {
-		http.Error(w, "Email is required", http.StatusBadRequest)
+	var creds models.Usuario
+	err := json.NewDecoder(r.Body).Decode(&creds)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("Login attempt for email: %s", email)
+	if strings.TrimSpace(creds.Email) == "" || strings.TrimSpace(creds.Senha) == "" {
+		http.Error(w, "Email and password are required", http.StatusBadRequest)
+		return
+	}
 
-	var userEmail string
-	err := config.DB.QueryRow("SELECT email FROM cadastro WHERE email = $1", email).Scan(&userEmail)
+	log.Printf("Login attempt for email: %s", creds.Email)
+
+	var userEmail, hashedPassword string
+	err = config.DB.QueryRow(
+		"SELECT email, senha FROM usuario WHERE email = $1",
+		creds.Email,
+	).Scan(&userEmail, &hashedPassword)
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "User not found", http.StatusNotFound)
@@ -143,13 +155,17 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hashedSenha := ""
-	if !utils.CheckSenhaHash(senha, hashedSenha) {
-		http.Error(w, "Senha incorreta", http.StatusUnauthorized)
+	// Verifica senha
+	if !utils.CheckSenhaHash(creds.Senha, hashedPassword) {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
+	// Login OK (aqui poderia gerar JWT, por exemplo)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Login successful"})
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Login successful",
+		"email":   userEmail,
+	})
 }

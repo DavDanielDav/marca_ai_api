@@ -42,7 +42,7 @@ func main() {
 
 	// Adicione esta linha para a rota de cadastro
 
-	mux.HandleFunc("/register-usuario", handlers.RegisterUsuarioHandler)
+	mux.HandleFunc("/Cadastro", handlers.RegisterUsuarioHandler)
 	mux.HandleFunc("/register-dono-de-arena", handlers.RegisterDonodeArenaHandler)
 	mux.HandleFunc("/login", handlers.LoginHandler)
 
