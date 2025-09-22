@@ -174,7 +174,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 func UpdateUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	id, err := strconv.Atoi(vars["id"])
+	id, err := strconv.Atoi(vars["id_cadastro"])
 	if err != nil {
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
 		return
@@ -209,7 +209,7 @@ func UpdateUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, err = config.DB.Exec(
-			"UPDATE usuario SET nome=$1, email=$2, telefone=$3, senha=$4 WHERE id=$5",
+			"UPDATE usuario SET nome=$1, email=$2, telefone=$3, senha=$4 WHERE id_cadastro=$5",
 			user.Username, user.Email, user.Telefone, hashedPassword, id,
 		)
 		if err != nil {
@@ -220,7 +220,7 @@ func UpdateUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Se a senha não for fornecida, não a atualize
 		_, err = config.DB.Exec(
-			"UPDATE usuario SET nome=$1, email=$2, telefone=$3 WHERE id=$4",
+			"UPDATE usuario SET nome=$1, email=$2, telefone=$3 WHERE id_cadastro=$4",
 			user.Username, user.Email, user.Telefone, id,
 		)
 		if err != nil {

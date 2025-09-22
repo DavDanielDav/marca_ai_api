@@ -8,6 +8,7 @@ import (
 
 	"github.com/danpi/marca_ai_backend/internal/config"
 	"github.com/danpi/marca_ai_backend/internal/handlers"
+	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
 )
@@ -19,7 +20,7 @@ func main() {
 		log.Println("⚠️ Aviso: arquivo .env não encontrado, usando variáveis do sistema")
 	}
 
-	mux := http.NewServeMux()
+	mux := mux.NewRouter()
 	// Configuração CORS
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"https://marca-ai.onrender.com"}, // frontend
@@ -40,23 +41,23 @@ func main() {
 	// Rota raiz
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "🚀 API Marca-Ai rodando com Go e PostgreSQL!")
-	})
+	}).Methods("GET")
 
 	// Rota de healthcheck
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "OK")
-	})
+	}).Methods("GET")
 
 	// Rotas de Usuario
-	mux.HandleFunc("/Cadastro", handlers.RegisterUsuarioHandler)
-	mux.HandleFunc("/login", handlers.LoginHandler)
-	mux.HandleFunc("/usuarioUpdate/{id}", handlers.UpdateUsuarioHandler)
-	mux.HandleFunc("/usuarioDelete/{id_cadastro}", handlers.DeleteUsuarioHandler)
+	mux.HandleFunc("/Cadastro", handlers.RegisterUsuarioHandler).Methods("POST")
+	mux.HandleFunc("/login", handlers.LoginHandler).Methods("POST")
+	mux.HandleFunc("/usuarioUpdate/{id_cadastro}", handlers.UpdateUsuarioHandler).Methods("PUT")
+	mux.HandleFunc("/usuarioDelete/{id_cadastro}", handlers.DeleteUsuarioHandler).Methods("DELETE")
 
 	// Rota de Dono de Arena
-	mux.HandleFunc("/register-dono-de-arena", handlers.RegisterDonodeArenaHandler)
+	mux.HandleFunc("/register-dono-de-arena", handlers.RegisterDonodeArenaHandler).Methods("POST")
 
-	log.Printf("Servidor rodando em http://localhost:%s\n", port)
+	log.Printf("Servidor rodando em http://localhost:%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, c.Handler(mux)))
 }
