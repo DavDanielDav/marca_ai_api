@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/danpi/marca_ai_backend/internal/config"
 	"github.com/danpi/marca_ai_backend/internal/models"
 	"github.com/danpi/marca_ai_backend/internal/utils"
+	"github.com/gorilla/mux"
 )
 
 func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
@@ -168,4 +170,89 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		"message": "Login successful",
 		"email":   userEmail,
 	})
+}
+
+func UpdateUsuarioHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	var user models.Usuario
+	err = json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validações
+	if strings.TrimSpace(user.Username) == "" {
+		http.Error(w, "Requer Nome", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(user.Email) == "" {
+		http.Error(w, "Requer Email", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(user.Telefone) == "" {
+		http.Error(w, "Telefone is required", http.StatusBadRequest)
+		return
+	}
+
+	// Se a senha for fornecida, atualize o hash
+	if user.Senha != "" {
+		hashedPassword, err := utils.HashSenha(user.Senha)
+		if err != nil {
+			http.Error(w, "Erro ao processar senha", http.StatusInternalServerError)
+			return
+		}
+		_, err = config.DB.Exec(
+			"UPDATE usuario SET nome=$1, email=$2, telefone=$3, senha=$4 WHERE id=$5",
+			user.Username, user.Email, user.Telefone, hashedPassword, id,
+		)
+		if err != nil {
+			log.Printf("Erro ao atualizar usuario no banco: %v", err)
+			http.Error(w, "Erro ao atualizar usuario", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		// Se a senha não for fornecida, não a atualize
+		_, err = config.DB.Exec(
+			"UPDATE usuario SET nome=$1, email=$2, telefone=$3 WHERE id=$4",
+			user.Username, user.Email, user.Telefone, id,
+		)
+		if err != nil {
+			log.Printf("Erro ao atualizar usuario no banco: %v", err)
+			http.Error(w, "Erro ao atualizar usuario", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	log.Printf("Usuario com ID %d atualizado com sucesso!", id)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Usuario atualizado com sucesso"})
+}
+
+func DeleteUsuarioHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id_cadastro"])
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	_, err = config.DB.Exec("DELETE FROM usuario WHERE id_cadastro=$1", id)
+	if err != nil {
+		log.Printf("Erro ao deletar usuario do banco: %v", err)
+		http.Error(w, "Erro ao deletar usuario", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Usuario com ID %d deletado com sucesso!", id)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Usuario deletado com sucesso"})
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/danpi/marca_ai_backend/internal/config"
 	"github.com/danpi/marca_ai_backend/internal/handlers"
 	"github.com/joho/godotenv"
+	"github.com/rs/cors"
 )
 
 func main() {
@@ -19,6 +20,13 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+	// Configuração CORS
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"https://marca-ai.onrender.com"}, // frontend
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
+	})
 
 	// Conectar ao banco PostgreSQL
 	config.ConnectDB()
@@ -40,12 +48,15 @@ func main() {
 		fmt.Fprintf(w, "OK")
 	})
 
-	// Adicione esta linha para a rota de cadastro
-
+	// Rotas de Usuario
 	mux.HandleFunc("/Cadastro", handlers.RegisterUsuarioHandler)
-	mux.HandleFunc("/register-dono-de-arena", handlers.RegisterDonodeArenaHandler)
 	mux.HandleFunc("/login", handlers.LoginHandler)
+	mux.HandleFunc("/usuarioUpdate/{id}", handlers.UpdateUsuarioHandler)
+	mux.HandleFunc("/usuarioDelete/{id_cadastro}", handlers.DeleteUsuarioHandler)
+
+	// Rota de Dono de Arena
+	mux.HandleFunc("/register-dono-de-arena", handlers.RegisterDonodeArenaHandler)
 
 	log.Printf("Servidor rodando em http://localhost:%s\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	log.Fatal(http.ListenAndServe(":"+port, c.Handler(mux)))
 }
