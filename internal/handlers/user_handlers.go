@@ -12,6 +12,7 @@ import (
 	"github.com/danpi/marca_ai_backend/internal/models"
 	"github.com/danpi/marca_ai_backend/internal/utils"
 	"github.com/gorilla/mux"
+	//"github.com/golang-jwt/jwt/v5"
 )
 
 func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
@@ -73,52 +74,6 @@ func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Usuario registrado com sucesso"})
-}
-
-func RegisterDonodeArenaHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var newDonodeArena models.DonoDeArena
-	err := json.NewDecoder(r.Body).Decode(&newDonodeArena)
-	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	log.Printf("Dados de cadastro recebidos: %+v", newDonodeArena)
-	//lógica de inserção no banco de dados aqui
-
-	if strings.TrimSpace(newDonodeArena.NomeDonoArena) == "" {
-		http.Error(w, "Nome is required", http.StatusBadRequest)
-		return
-	}
-	if strings.TrimSpace(newDonodeArena.Cnpj) == "" {
-		http.Error(w, "CNPJ is required", http.StatusBadRequest)
-		return
-	}
-	if strings.TrimSpace(newDonodeArena.Arena) == "" {
-		http.Error(w, "Nome da arena is required", http.StatusBadRequest)
-		return
-	}
-	_, err = config.DB.Exec(
-		"INSERT INTO dono_de_arena (nome_dono_arena, cnpj, arena) VALUES ($1, $2, $3)",
-		newDonodeArena.NomeDonoArena, newDonodeArena.Cnpj, newDonodeArena.Arena, // TODO: Hash da senha antes de salvar!
-	)
-
-	if err != nil {
-		log.Printf("Erro ao inserir usuário Dono de arena no banco de dados: %v", err)
-		http.Error(w, "Erro ao registrar Dono de arena", http.StatusInternalServerError)
-		return
-	}
-
-	log.Println("Dono de arena inserido no banco de dados com sucesso!")
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Dono de Arena registrado com sucesso"})
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {

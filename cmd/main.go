@@ -55,9 +55,6 @@ func main() {
 	mux.HandleFunc("/usuarioUpdate/{id_cadastro}", handlers.UpdateUsuarioHandler).Methods("PUT")
 	mux.HandleFunc("/usuarioDelete/{id_cadastro}", handlers.DeleteUsuarioHandler).Methods("DELETE")
 
-	// Rota de Dono de Arena
-	mux.HandleFunc("/register-dono-de-arena", handlers.RegisterDonodeArenaHandler).Methods("POST")
-
 	log.Printf("Servidor rodando em http://localhost:%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, c.Handler(mux)))
 }
