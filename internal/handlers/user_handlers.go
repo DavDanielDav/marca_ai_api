@@ -7,13 +7,22 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/danpi/marca_ai_backend/internal/config"
 	"github.com/danpi/marca_ai_backend/internal/models"
 	"github.com/danpi/marca_ai_backend/internal/utils"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
-	//"github.com/golang-jwt/jwt/v5"
 )
+
+type Claims struct {
+	ID    string `json:"id_usuario"`
+	Email string `json:"email"`
+	jwt.RegisteredClaims
+}
+
+var jwtKey = []byte("Tn9Jb2lfVGhpc19pc19hX3N0cm9uZ19qd3Rfa2V5X2ZvciB5b3Uh")
 
 func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
@@ -43,10 +52,6 @@ func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Password is required", http.StatusBadRequest)
 		return
 	}
-	if strings.TrimSpace(newUser.Telefone) == "" {
-		http.Error(w, "Telefone is required", http.StatusBadRequest)
-		return
-	}
 
 	// Gera o hash da senha
 	hashedPassword, err := utils.HashSenha(newUser.Senha)
@@ -57,8 +62,8 @@ func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Salva no banco já com hash
 	_, err = config.DB.Exec(
-		"INSERT INTO usuario (nome, email, telefone, senha) VALUES ($1, $2, $3, $4)",
-		newUser.Username, newUser.Email, newUser.Telefone, hashedPassword,
+		"INSERT INTO usuario (nome, email, , senha) VALUES ($1, $2, $3, )",
+		newUser.Username, newUser.Email, hashedPassword,
 	)
 	if err != nil {
 		log.Printf("Erro ao inserir usuario no banco: %v", err)
@@ -96,11 +101,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Login attempt for email: %s", creds.Email)
 
-	var userEmail, hashedPassword string
+	var userID, userEmail, hashedPassword string
 	err = config.DB.QueryRow(
-		"SELECT email, senha FROM usuario WHERE email = $1",
+		"SELECT id_usuario, email, senha FROM usuario WHERE email = $1",
 		creds.Email,
-	).Scan(&userEmail, &hashedPassword)
+	).Scan(&userID, &userEmail, &hashedPassword)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -119,11 +124,28 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Login OK (aqui poderia gerar JWT, por exemplo)
+	experationTime := time.Now().Add(1 * time.Hour)
+
+	claims := &Claims{
+		Email: creds.Email,
+		ID:    userID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(experationTime),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		http.Error(w, "Erro ao gerar token", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Login successful",
-		"email":   userEmail,
+		"messagem": "Logado com sucesso!!",
+		"token ":   tokenString,
 	})
 }
 
