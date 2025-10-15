@@ -5,22 +5,15 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/danpi/marca_ai_backend/internal/config"
+	"github.com/danpi/marca_ai_backend/internal/middleware"
 	"github.com/danpi/marca_ai_backend/internal/models"
 	"github.com/danpi/marca_ai_backend/internal/utils"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/gorilla/mux"
 )
-
-type Claims struct {
-	ID    string `json:"id_usuario"`
-	Email string `json:"email"`
-	jwt.RegisteredClaims
-}
 
 var jwtKey = []byte("Tn9Jb2lfVGhpc19pc19hX3N0cm9uZ19qd3Rfa2V5X2ZvciB5b3Uh")
 
@@ -62,7 +55,7 @@ func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Salva no banco já com hash
 	_, err = config.DB.Exec(
-		"INSERT INTO usuario (nome, email, , senha) VALUES ($1, $2, $3, )",
+		"INSERT INTO usuario (nome, email, senha) VALUES ($1, $2, $3 )",
 		newUser.Username, newUser.Email, hashedPassword,
 	)
 	if err != nil {
@@ -101,7 +94,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Login attempt for email: %s", creds.Email)
 
-	var userID, userEmail, hashedPassword string
+	var userID int
+	var userEmail, hashedPassword string
 	err = config.DB.QueryRow(
 		"SELECT id_usuario, email, senha FROM usuario WHERE email = $1",
 		creds.Email,
@@ -109,7 +103,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "User not found", http.StatusNotFound)
+			http.Error(w, "Usuario nao encontrado!!", http.StatusNotFound)
 			return
 		}
 		log.Printf("Error querying database: %v", err)
@@ -123,12 +117,12 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Login OK (aqui poderia gerar JWT, por exemplo)
+	// Login OK gerar JWT
 	experationTime := time.Now().Add(1 * time.Hour)
 
-	claims := &Claims{
-		Email: creds.Email,
+	claims := &middleware.Claims{
 		ID:    userID,
+		Email: userEmail,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(experationTime),
 		},
@@ -149,32 +143,36 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func UpdateUsuarioHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id, err := strconv.Atoi(vars["id_cadastro"])
-	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+func GetUserHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		http.Error(w, "Não foi possível obter o ID do usuário do token", http.StatusInternalServerError)
 		return
 	}
 
 	var user models.Usuario
-	err = json.NewDecoder(r.Body).Decode(&user)
+	err := config.DB.QueryRow("SELECT id_cadastro, nome, email, telefone FROM usuario WHERE id_cadastro=$1", userID).Scan(&user.ID, &user.Username, &user.Email, &user.Telefone)
 	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(w, "Usuário não encontrado", http.StatusNotFound)
 		return
 	}
 
-	// Validações
-	if strings.TrimSpace(user.Username) == "" {
-		http.Error(w, "Requer Nome", http.StatusBadRequest)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+}
+
+func UpdateUsuarioHandler(w http.ResponseWriter, r *http.Request) {
+	// Pega o ID do usuário do contexto, injetado pelo middleware.
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		http.Error(w, "Não foi possível obter o ID do usuário do token", http.StatusInternalServerError)
 		return
 	}
-	if strings.TrimSpace(user.Email) == "" {
-		http.Error(w, "Requer Email", http.StatusBadRequest)
-		return
-	}
-	if strings.TrimSpace(user.Telefone) == "" {
-		http.Error(w, "Telefone is required", http.StatusBadRequest)
+
+	var user models.Usuario
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		http.Error(w, "Corpo da requisição inválido", http.StatusBadRequest)
 		return
 	}
 
@@ -185,20 +183,32 @@ func UpdateUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Erro ao processar senha", http.StatusInternalServerError)
 			return
 		}
-		_, err = config.DB.Exec(
-			"UPDATE usuario SET nome=$1, email=$2, telefone=$3, senha=$4 WHERE id_cadastro=$5",
-			user.Username, user.Email, user.Telefone, hashedPassword, id,
+		_, err = config.DB.Exec(`
+			UPDATE usuario 
+			SET 
+			nome = COALESCE(NULLIF($1, ''), nome),
+			email = COALESCE(NULLIF($2, ''), email),
+			telefone = COALESCE(NULLIF($3, ''), telefone),
+			senha = COALESCE(NULLIF($4, ''), senha)
+			WHERE id_usuario = $5`,
+			user.Username, user.Email, user.Telefone, hashedPassword, userID,
 		)
 		if err != nil {
 			log.Printf("Erro ao atualizar usuario no banco: %v", err)
 			http.Error(w, "Erro ao atualizar usuario", http.StatusInternalServerError)
 			return
 		}
+
 	} else {
 		// Se a senha não for fornecida, não a atualize
-		_, err = config.DB.Exec(
-			"UPDATE usuario SET nome=$1, email=$2, telefone=$3 WHERE id_cadastro=$4",
-			user.Username, user.Email, user.Telefone, id,
+		_, err = config.DB.Exec(`
+			UPDATE usuario 
+			SET 
+			nome = COALESCE(NULLIF($1, ''), nome),
+			email = COALESCE(NULLIF($2, ''), email),
+			telefone = COALESCE(NULLIF($3, ''), telefone)
+			WHERE id_usuario = $4`,
+			user.Username, user.Email, user.Telefone, userID,
 		)
 		if err != nil {
 			log.Printf("Erro ao atualizar usuario no banco: %v", err)
@@ -207,28 +217,29 @@ func UpdateUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Printf("Usuario com ID %d atualizado com sucesso!", id)
+	log.Printf("Usuario com ID %d atualizado com sucesso!", userID)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Usuario atualizado com sucesso"})
 }
 
+// DeleteUsuarioHandler deleta o usuário logado.
 func DeleteUsuarioHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id, err := strconv.Atoi(vars["id_cadastro"])
-	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+	// Pega o ID do usuário do contexto.
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		http.Error(w, "Não foi possível obter o ID do usuário do token", http.StatusInternalServerError)
 		return
 	}
 
-	_, err = config.DB.Exec("DELETE FROM usuario WHERE id_cadastro=$1", id)
+	_, err := config.DB.Exec("DELETE FROM usuario WHERE id_usuario=$1", userID)
 	if err != nil {
 		log.Printf("Erro ao deletar usuario do banco: %v", err)
 		http.Error(w, "Erro ao deletar usuario", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Usuario com ID %d deletado com sucesso!", id)
+	log.Printf("Usuario com ID %d deletado com sucesso!", userID)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Usuario deletado com sucesso"})

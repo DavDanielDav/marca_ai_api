@@ -8,6 +8,7 @@ import (
 
 	"github.com/danpi/marca_ai_backend/internal/config"
 	"github.com/danpi/marca_ai_backend/internal/handlers"
+	"github.com/danpi/marca_ai_backend/internal/middleware"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
@@ -20,7 +21,7 @@ func main() {
 		log.Println("⚠️ Aviso: arquivo .env não encontrado, usando variáveis do sistema")
 	}
 
-	mux := mux.NewRouter()
+	r := mux.NewRouter()
 	// Configuração CORS
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"https://marca-ai.onrender.com"}, // frontend
@@ -39,22 +40,29 @@ func main() {
 	}
 
 	// Rota raiz
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "🚀 API Marca-Ai rodando com Go e PostgreSQL!")
 	}).Methods("GET")
 
 	// Rota de healthcheck
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "OK")
 	}).Methods("GET")
 
-	// Rotas de Usuario
-	mux.HandleFunc("/Cadastro", handlers.RegisterUsuarioHandler).Methods("POST")
-	mux.HandleFunc("/login", handlers.LoginHandler).Methods("POST")
-	mux.HandleFunc("/usuarioUpdate/{id_cadastro}", handlers.UpdateUsuarioHandler).Methods("PUT")
-	mux.HandleFunc("/usuarioDelete/{id_cadastro}", handlers.DeleteUsuarioHandler).Methods("DELETE")
+	// Rotas de Usuario (Públicas)
+	r.HandleFunc("/cadastro", handlers.RegisterUsuarioHandler).Methods("POST")
+	r.HandleFunc("/login", handlers.LoginHandler).Methods("POST")
+
+	// --- Rotas Protegidas ---
+	// O sub-roteador 'authRouter' aplica o middleware de autenticação a todas as suas rotas.
+	authRouter := r.PathPrefix("").Subrouter()
+	authRouter.Use(middleware.AuthMiddleware)
+	authRouter.HandleFunc("/GetUsuario", handlers.GetUserHandler).Methods("GET")
+	authRouter.HandleFunc("/editar-perfil", handlers.UpdateUsuarioHandler).Methods("PUT")
+	authRouter.HandleFunc("/excluir-conta", handlers.DeleteUsuarioHandler).Methods("DELETE")
+	authRouter.HandleFunc("/cadastro-arena", handlers.CadastrodeArena).Methods("POST")
 
 	log.Printf("Servidor rodando em http://localhost:%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, c.Handler(mux)))
+	log.Fatal(http.ListenAndServe(":"+port, c.Handler(r)))
 }
