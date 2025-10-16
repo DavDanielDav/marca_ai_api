@@ -53,17 +53,22 @@ func main() {
 	// Rotas de Usuario (Públicas)
 	r.HandleFunc("/cadastro", handlers.RegisterUsuarioHandler).Methods("POST")
 	r.HandleFunc("/login", handlers.LoginHandler).Methods("POST")
-	r.HandleFunc("/cadastro-arena", handlers.CadastrodeArena).Methods("POST")
-	r.HandleFunc("/cadastro-campo", handlers.CadastrodeCampo).Methods("POST")
 
 	// --- Rotas Protegidas ---
 	// O sub-roteador 'authRouter' aplica o middleware de autenticação a todas as suas rotas.
 	authRouter := r.PathPrefix("").Subrouter()
 	authRouter.Use(middleware.AuthMiddleware)
-	authRouter.HandleFunc("/GetUsuario", handlers.GetUserHandler).Methods("GET")
+	//USUARIO
+	authRouter.HandleFunc("/Usuario", handlers.GetUserHandler).Methods("GET")
 	authRouter.HandleFunc("/editar-perfil", handlers.UpdateUsuarioHandler).Methods("PUT")
 	authRouter.HandleFunc("/excluir-conta", handlers.DeleteUsuarioHandler).Methods("DELETE")
-	//authRouter.HandleFunc("/cadastro-arena", handlers.CadastrodeArena).Methods("POST")
+	//ARENAS
+	authRouter.HandleFunc("/cadastrar-arena", handlers.CadastrodeArena).Methods("POST")
+	authRouter.HandleFunc("/excluir-arena", handlers.DeleteArena).Methods("DELETE")
+	authRouter.HandleFunc("/editar-arena", handlers.UpdateArena).Methods("PUT")
+	authRouter.HandleFunc("/arenas", handlers.GetArenas).Methods("GET")
+	//CAMPOS
+	authRouter.HandleFunc("/cadastrar-campo", handlers.CadastrodeCampo).Methods("POST")
 
 	log.Printf("Servidor rodando em http://localhost:%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, c.Handler(r)))
