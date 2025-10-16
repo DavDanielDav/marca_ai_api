@@ -2,7 +2,7 @@ package utils
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"mime/multipart"
 	"os"
 
@@ -12,12 +12,13 @@ import (
 
 func UploadCloudinary(file multipart.File, filename string) (string, error) {
 	cld, err := cloudinary.NewFromParams(
-		os.Getenv("CLOUD_NAME"),
-		os.Getenv("API_KEY"),
-		os.Getenv("API_SECRET"),
+		os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		os.Getenv("CLOUDINARY_API_KEY"),
+		os.Getenv("CLOUDINARY_API_SECRET"),
 	)
 	if err != nil {
-		return "", fmt.Errorf("erro ao conectar ao Cloudinary: %v", err)
+		log.Printf("erro ao conectar ao Cloudinary: %v", err)
+		return "", err
 	}
 
 	uploadResult, err := cld.Upload.Upload(context.Background(), file, uploader.UploadParams{
@@ -25,7 +26,8 @@ func UploadCloudinary(file multipart.File, filename string) (string, error) {
 		Folder:   "arenas",
 	})
 	if err != nil {
-		return "", fmt.Errorf("erro ao enviar imagem: %v", err)
+		log.Printf("erro ao enviar imagem cloudinary: %v", err)
+		return "", err
 	}
 
 	return uploadResult.SecureURL, nil

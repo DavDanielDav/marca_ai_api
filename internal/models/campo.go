@@ -1,7 +1,7 @@
 package models
 
 // Jogador
-type campo struct {
+type Campo struct {
 	Nome         string `json:"nome_campo"`
 	MaxJogadores int    `json:"qtde_jogador"`
 	Modalidade   string `json:"modalidade"`

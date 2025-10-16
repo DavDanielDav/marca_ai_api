@@ -24,7 +24,7 @@ func main() {
 	r := mux.NewRouter()
 	// Configuração CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"https://marca-ai.onrender.com"}, // frontend
+		AllowedOrigins:   []string{"http://localhost:5173"}, // frontend
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization"},
 		AllowCredentials: true,
@@ -53,6 +53,8 @@ func main() {
 	// Rotas de Usuario (Públicas)
 	r.HandleFunc("/cadastro", handlers.RegisterUsuarioHandler).Methods("POST")
 	r.HandleFunc("/login", handlers.LoginHandler).Methods("POST")
+	r.HandleFunc("/cadastro-arena", handlers.CadastrodeArena).Methods("POST")
+	r.HandleFunc("/cadastro-campo", handlers.CadastrodeCampo).Methods("POST")
 
 	// --- Rotas Protegidas ---
 	// O sub-roteador 'authRouter' aplica o middleware de autenticação a todas as suas rotas.
@@ -61,7 +63,7 @@ func main() {
 	authRouter.HandleFunc("/GetUsuario", handlers.GetUserHandler).Methods("GET")
 	authRouter.HandleFunc("/editar-perfil", handlers.UpdateUsuarioHandler).Methods("PUT")
 	authRouter.HandleFunc("/excluir-conta", handlers.DeleteUsuarioHandler).Methods("DELETE")
-	authRouter.HandleFunc("/cadastro-arena", handlers.CadastrodeArena).Methods("POST")
+	//authRouter.HandleFunc("/cadastro-arena", handlers.CadastrodeArena).Methods("POST")
 
 	log.Printf("Servidor rodando em http://localhost:%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, c.Handler(r)))
