@@ -53,6 +53,7 @@ func main() {
 	// Rotas de Usuario (Públicas)
 	r.HandleFunc("/cadastro", handlers.RegisterUsuarioHandler).Methods("POST")
 	r.HandleFunc("/login", handlers.LoginHandler).Methods("POST")
+	//r.HandleFunc("/cadastrar-arena", handlers.CadastrodeArena).Methods("POST")
 
 	// --- Rotas Protegidas ---
 	// O sub-roteador 'authRouter' aplica o middleware de autenticação a todas as suas rotas.

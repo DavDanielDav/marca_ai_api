@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strings"
 
@@ -29,6 +30,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			http.Error(w, "Token de autorização não fornecido", http.StatusUnauthorized)
+			log.Printf("Token nao fornecido")
 			return
 		}
 
@@ -36,6 +38,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
 			http.Error(w, "Formato do token inválido", http.StatusUnauthorized)
+			log.Printf("Formato de Token Invalido")
 			return
 		}
 		tokenString := parts[1]
@@ -46,6 +49,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		})
 		if err != nil || !token.Valid {
 			http.Error(w, "Token inválido", http.StatusUnauthorized)
+			log.Printf("Token invalido")
 			return
 		}
 

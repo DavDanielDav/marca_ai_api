@@ -139,7 +139,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
 		"messagem": "Logado com sucesso!!",
-		"token ":   tokenString,
+		"token":    tokenString,
 	})
 }
 
