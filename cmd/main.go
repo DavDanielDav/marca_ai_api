@@ -70,6 +70,9 @@ func main() {
 	authRouter.HandleFunc("/arenas", handlers.GetArenas).Methods("GET")
 	//CAMPOS
 	authRouter.HandleFunc("/cadastrar-campo", handlers.CadastrodeCampo).Methods("POST")
+	authRouter.HandleFunc("/listar-campos", handlers.GetCampos).Methods("GET")
+	//AGENDAMENTOS
+	authRouter.HandleFunc("/cadastrar-agendamento", handlers.AgendarCampo).Methods("POST")
 
 	log.Printf("Servidor rodando em http://localhost:%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, c.Handler(r)))
