@@ -24,7 +24,7 @@ func main() {
 	r := mux.NewRouter()
 	// Configuração CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173"}, // frontend
+		AllowedOrigins:   []string{"*"}, // frontend
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization"},
 		AllowCredentials: true,
@@ -72,8 +72,10 @@ func main() {
 	//CAMPOS
 	authRouter.HandleFunc("/cadastrar-campo", handlers.CadastrodeCampo).Methods("POST")
 	authRouter.HandleFunc("/listar-campos", handlers.GetCampos).Methods("GET")
-	//AGENDAMENTOS
+	// AGENDAMENTOS
 	authRouter.HandleFunc("/cadastrar-agendamento", handlers.AgendarCampo).Methods("POST")
+	authRouter.HandleFunc("/agendamentos", handlers.GetAgendamentos).Methods("GET")
+	authRouter.HandleFunc("/agendamentos/status", handlers.AtualizarStatusAgendamento).Methods("PUT")
 
 	log.Printf("Servidor rodando em http://localhost:%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, c.Handler(r)))

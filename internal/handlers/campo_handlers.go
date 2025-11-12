@@ -34,7 +34,7 @@ func CadastrodeCampo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ✅ Coletar campos do form
-	nome := r.FormValue("nome")
+	nome := r.FormValue("nome_campo")
 	maxJogadores := r.FormValue("maxJogadores")
 	modalidade := r.FormValue("modalidade")
 	tipoCampo := r.FormValue("tipoCampo")

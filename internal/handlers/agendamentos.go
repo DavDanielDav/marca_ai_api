@@ -12,13 +12,17 @@ import (
 )
 
 type AgendamentoRequest struct {
-	IDCampo   int       `json:"campo"`
+	IDCampo   int       `json:"id_campo"`
 	Horario   time.Time `json:"horario"`
 	Jogadores int       `json:"jogadores"`
 	Pagamento string    `json:"pagamento"`
 	Pago      bool      `json:"pago"`
 	Status    string    `json:"status"`
-	CriadoEm  time.Time `json:"criadoEm"`
+	CriadoEm  time.Time `json:"criado_em"`
+	ID        int       `json:"id"`
+	IDUsuario int       `json:"id_usuario"`
+	NomeCampo string    `json:"nome_campo"`
+	NomeArena string    `json:"nome_arena"`
 }
 
 func AgendarCampo(w http.ResponseWriter, r *http.Request) {
@@ -75,4 +79,103 @@ func AgendarCampo(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprint(w, "Agendamento realizado com sucesso")
+}
+func GetAgendamentos(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		http.Error(w, "Usuário não autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	query := `
+		SELECT 
+			a.id,
+			a.id_usuario,
+			a.id_campo,
+			a.horario,
+			a.jogadores,
+			a.pagamento,
+			a.pago,
+			a.status,
+			a.criado_em,
+			c.nome_campo,
+			ar.nome AS nome_arena
+		FROM agendamentos a
+		JOIN campo c ON a.id_campo = c.id_campo
+		JOIN arenas ar ON c.id_arena = ar.id
+		WHERE a.id_usuario = $1
+		ORDER BY a.horario DESC;
+	`
+
+	rows, err := config.DB.Query(query, userID)
+	if err != nil {
+		http.Error(w, "Erro ao buscar agendamentos", http.StatusInternalServerError)
+		log.Printf("Erro ao buscar agendamentos: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	var agendamentos []AgendamentoRequest
+	for rows.Next() {
+		var ag AgendamentoRequest
+		if err := rows.Scan(
+			&ag.ID,
+			&ag.IDUsuario,
+			&ag.IDCampo,
+			&ag.Horario,
+			&ag.Jogadores,
+			&ag.Pagamento,
+			&ag.Pago,
+			&ag.Status,
+			&ag.CriadoEm,
+			&ag.NomeCampo,
+			&ag.NomeArena,
+		); err != nil {
+			http.Error(w, "Erro ao ler agendamentos", http.StatusInternalServerError)
+			log.Printf("Erro ao escanear agendamento: %v", err)
+			return
+		}
+		agendamentos = append(agendamentos, ag)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(agendamentos)
+}
+func AtualizarStatusAgendamento(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Ler parâmetros JSON
+	var body struct {
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Erro ao decodificar JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Pegar o ID do agendamento da URL
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "ID do agendamento é obrigatório", http.StatusBadRequest)
+		return
+	}
+
+	// Atualizar no banco
+	_, err := config.DB.Exec(`UPDATE agendamentos SET status = $1 WHERE id = $2`, body.Status, id)
+	if err != nil {
+		http.Error(w, "Erro ao atualizar status", http.StatusInternalServerError)
+		log.Printf("Erro ao atualizar status: %v", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Status atualizado para %s", body.Status)
 }
