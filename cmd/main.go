@@ -53,6 +53,7 @@ func main() {
 	// Rotas de Usuario (Públicas)
 	r.HandleFunc("/cadastro", handlers.RegisterUsuarioHandler).Methods("POST")
 	r.HandleFunc("/login", handlers.LoginHandler).Methods("POST")
+	r.HandleFunc("/ajogador", handlers.GetArenasJogador).Methods("GET")
 	//r.HandleFunc("/cadastrar-arena", handlers.CadastrodeArena).Methods("POST")
 
 	// --- Rotas Protegidas ---
