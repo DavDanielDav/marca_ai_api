@@ -24,7 +24,7 @@ func main() {
 	r := mux.NewRouter()
 	// Configuração CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"}, // frontend
+		AllowedOrigins:   []string{"http://localhost:5173"}, // frontend
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization"},
 		AllowCredentials: true,
