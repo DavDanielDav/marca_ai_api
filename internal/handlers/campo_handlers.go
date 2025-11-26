@@ -10,6 +10,7 @@ import (
 	"github.com/danpi/marca_ai_backend/internal/middleware"
 	"github.com/danpi/marca_ai_backend/internal/models"
 	"github.com/danpi/marca_ai_backend/internal/utils"
+	"github.com/gorilla/mux"
 )
 
 func CadastrodeCampo(w http.ResponseWriter, r *http.Request) {
@@ -197,4 +198,118 @@ func GetCampos(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(campos)
+}
+
+func UpdateCampo(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idCampoStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID do campo não fornecido", http.StatusBadRequest)
+		return
+	}
+
+	idCampo, err := strconv.Atoi(idCampoStr)
+	if err != nil {
+		http.Error(w, "ID do campo inválido", http.StatusBadRequest)
+		return
+	}
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		http.Error(w, "Não foi possível obter o ID do usuário", http.StatusUnauthorized)
+		return
+	}
+
+	var campo models.Campo
+	err = json.NewDecoder(r.Body).Decode(&campo)
+	if err != nil {
+		http.Error(w, "Erro ao decodificar corpo da requisição", http.StatusBadRequest)
+		return
+	}
+
+	// Verificar se o campo pertence a uma arena do usuário
+	var pertence bool
+	err = config.DB.QueryRow(`
+        SELECT EXISTS (
+            SELECT 1 FROM campo c
+            JOIN arenas a ON c.id_arena = a.id
+            WHERE c.id_campo = $1 AND a.usuario_id = $2
+        )
+    `, idCampo, userID).Scan(&pertence)
+
+	if err != nil {
+		http.Error(w, "Erro ao verificar propriedade do campo", http.StatusInternalServerError)
+		return
+	}
+
+	if !pertence {
+		http.Error(w, "O campo não pertence ao usuário", http.StatusForbidden)
+		return
+	}
+
+	// Atualizar o campo no banco de dados
+	_, err = config.DB.Exec(`
+        UPDATE campo SET nome_campo = $1, max_jogadores = $2, modalidade = $3, tipo_campo = $4
+        WHERE id_campo = $5
+    `, campo.Nome, campo.MaxJogadores, campo.Modalidade, campo.TipoCampo, idCampo)
+
+	if err != nil {
+		http.Error(w, "Erro ao atualizar campo", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Campo atualizado com sucesso"})
+}
+
+func DeleteCampo(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idCampoStr, ok := vars["id"]
+	if !ok {
+		http.Error(w, "ID do campo não fornecido", http.StatusBadRequest)
+		return
+	}
+
+	idCampo, err := strconv.Atoi(idCampoStr)
+	if err != nil {
+		http.Error(w, "ID do campo inválido", http.StatusBadRequest)
+		return
+	}
+
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		http.Error(w, "Não foi possível obter o ID do usuário", http.StatusUnauthorized)
+		return
+	}
+
+	// Verificar se o campo pertence a uma arena do usuário
+	var pertence bool
+	err = config.DB.QueryRow(`
+        SELECT EXISTS (
+            SELECT 1 FROM campo c
+            JOIN arenas a ON c.id_arena = a.id
+            WHERE c.id_campo = $1 AND a.usuario_id = $2
+        )
+    `, idCampo, userID).Scan(&pertence)
+
+	if err != nil {
+		http.Error(w, "Erro ao verificar propriedade do campo", http.StatusInternalServerError)
+		return
+	}
+
+	if !pertence {
+		http.Error(w, "O campo não pertence ao usuário", http.StatusForbidden)
+		return
+	}
+
+	// Deletar o campo
+	_, err = config.DB.Exec("DELETE FROM campo WHERE id_campo = $1", idCampo)
+	if err != nil {
+		http.Error(w, "Erro ao deletar campo", http.StatusInternalServerError)
+		return
+	}
+
+	httpStatusOK := 0
+	w.WriteHeader(httpStatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Campo deletado com sucesso"})
 }
