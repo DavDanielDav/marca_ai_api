@@ -24,7 +24,7 @@ func main() {
 	r := mux.NewRouter()
 	// Configuração CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"}, // frontend
+		AllowedOrigins:   []string{"http://localhost:5173"}, // frontend
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization"},
 		AllowCredentials: true,
@@ -72,6 +72,8 @@ func main() {
 	//CAMPOS
 	authRouter.HandleFunc("/cadastrar-campo", handlers.CadastrodeCampo).Methods("POST")
 	authRouter.HandleFunc("/listar-campos", handlers.GetCampos).Methods("GET")
+	authRouter.HandleFunc("/campo/{id}", handlers.UpdateCampo).Methods("PUT")
+	authRouter.HandleFunc("/campo/{id}", handlers.DeleteCampo).Methods("DELETE")
 	// AGENDAMENTOS
 	authRouter.HandleFunc("/cadastrar-agendamento", handlers.AgendarCampo).Methods("POST")
 	authRouter.HandleFunc("/agendamentos", handlers.GetAgendamentos).Methods("GET")
