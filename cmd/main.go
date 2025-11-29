@@ -72,8 +72,8 @@ func main() {
 	//CAMPOS
 	authRouter.HandleFunc("/cadastrar-campo", handlers.CadastrodeCampo).Methods("POST")
 	authRouter.HandleFunc("/listar-campos", handlers.GetCampos).Methods("GET")
-	authRouter.HandleFunc("/campo/{id}", handlers.UpdateCampo).Methods("PUT")
-	authRouter.HandleFunc("/campo/{id}", handlers.DeleteCampo).Methods("DELETE")
+	authRouter.HandleFunc("/editar-campo/{id}", handlers.UpdateCampo).Methods("PUT")
+	authRouter.HandleFunc("/excluir-campo/{id}", handlers.DeleteCampo).Methods("DELETE")
 	// AGENDAMENTOS
 	authRouter.HandleFunc("/cadastrar-agendamento", handlers.AgendarCampo).Methods("POST")
 	authRouter.HandleFunc("/agendamentos", handlers.GetAgendamentos).Methods("GET")

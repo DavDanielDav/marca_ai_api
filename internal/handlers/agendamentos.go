@@ -139,7 +139,7 @@ func AgendarCampo(w http.ResponseWriter, r *http.Request) {
 	// -----------------------
 	// 6. Log completo
 	// -----------------------
-	log.Printf(
+	/*log.Printf(
 		"📥 FRONT → BACK | Dados recebidos:\n"+
 			"CampoID: %d\n"+
 			"Horario (string): %s\n"+
@@ -155,7 +155,7 @@ func AgendarCampo(w http.ResponseWriter, r *http.Request) {
 		agendamento.Pagamento,
 		agendamento.Pago,
 		userID,
-	)
+	)*/
 
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprint(w, "Agendamento realizado com sucesso")
