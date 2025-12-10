@@ -303,13 +303,46 @@ func DeleteCampo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Deletar o campo
-	_, err = config.DB.Exec("DELETE FROM campo WHERE id_campo = $1", idCampo)
+	// Verificar se existem agendamentos ativos
+	var countNaoPermitidos int
+	err = config.DB.QueryRow(`
+    SELECT COUNT(*) 
+    FROM agendamentos
+    WHERE id_campo = $1 
+      AND status NOT IN ('concluido', 'cancelado')
+	`, idCampo).Scan(&countNaoPermitidos)
+
 	if err != nil {
-		http.Error(w, "Erro ao deletar campo", http.StatusInternalServerError)
+		http.Error(w, "Erro ao verificar agendamentos do campo", http.StatusInternalServerError)
 		return
 	}
 
-	httpStatusOK := 0
-	w.WriteHeader(httpStatusOK)
+	if countNaoPermitidos > 0 {
+		http.Error(w, "Não é possível excluir o campo: existem agendamentos ativos vinculados", http.StatusBadRequest)
+		return
+	}
+
+	// Deletar agendamentos cancelados automaticamente
+	_, err = config.DB.Exec(`
+    DELETE FROM agendamentos 
+	WHERE id_campo = $1 
+  	AND status IN ('cancelado', 'concluido')
+	`, idCampo)
+
+	if err != nil {
+		http.Error(w, "Erro ao excluir agendamentos cancelados", http.StatusInternalServerError)
+		return
+	}
+
+	// deletar o campo
+	_, err = config.DB.Exec("DELETE FROM campo WHERE id_campo = $1", idCampo)
+	if err != nil {
+		http.Error(w, "Erro ao deletar campo", http.StatusInternalServerError)
+		log.Println("ERRO AO DELETAR:", err) // <-- LOG DE ERRO
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Campo deletado com sucesso"})
+
 }
