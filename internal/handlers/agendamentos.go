@@ -273,3 +273,113 @@ func AtualizarStatusAgendamento(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Status atualizado")
 }
+
+func EditarAgendamento(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// -----------------------------
+	// 1. ID obrigatório
+	// -----------------------------
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "ID do agendamento é obrigatório", http.StatusBadRequest)
+		log.Printf("Id nao fornecido")
+		return
+	}
+
+	// -----------------------------
+	// 2. Body recebido do front
+	// -----------------------------
+	var body struct {
+		CampoID   int    `json:"campo_id"`
+		Horario   string `json:"horario"` // formato 2025-11-26T20:00
+		Jogadores int    `json:"jogadores"`
+		Pagamento string `json:"pagamento"`
+		Pago      bool   `json:"pago"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Erro ao decodificar JSON", http.StatusBadRequest)
+		log.Printf("Erro ao decodificar JSON")
+		return
+	}
+
+	// -----------------------------
+	// 3. Converte horário com timezone SP
+	// -----------------------------
+	location, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		http.Error(w, "Erro ao carregar fuso horário", http.StatusInternalServerError)
+		log.Printf("Erro ao carregar fuso horario")
+		return
+	}
+
+	horarioParsed, err := time.ParseInLocation("2006-01-02T15:04", body.Horario, location)
+	if err != nil {
+		http.Error(w, "Formato de horário inválido", http.StatusBadRequest)
+		log.Printf("Fomato de hora invalido")
+		return
+	}
+
+	// -----------------------------
+	// 4. Verifica se horário está livre
+	//    (não pode ser o próprio ID)
+	// -----------------------------
+	var count int
+	err = config.DB.QueryRow(`
+        SELECT COUNT(*)
+        FROM agendamentos
+        WHERE id_campo = $1
+        AND horario = $2
+        AND id != $3
+        AND status != 'cancelado'
+    `, body.CampoID, horarioParsed, id).Scan(&count)
+
+	if err != nil {
+		http.Error(w, "Erro ao verificar disponibilidade", http.StatusInternalServerError)
+		log.Printf("Erro ao verificar disponibilidade")
+		return
+	}
+
+	if count > 0 {
+		http.Error(w, "Este horário já está reservado para o campo selecionado.", http.StatusConflict)
+		log.Printf("Horario nao disponivel")
+		return
+	}
+
+	// -----------------------------
+	// 5. Atualiza o agendamento
+	// -----------------------------
+	_, err = config.DB.Exec(`
+        UPDATE agendamentos
+        SET id_campo = $1,
+            horario = $2,
+            jogadores = $3,
+            pagamento = $4,
+            pago = $5
+        WHERE id = $6
+    `,
+		body.CampoID,
+		horarioParsed,
+		body.Jogadores,
+		body.Pagamento,
+		body.Pago,
+		id,
+	)
+
+	if err != nil {
+		http.Error(w, "Erro ao atualizar agendamento", http.StatusInternalServerError)
+		log.Printf("Erro ao atualizar")
+		return
+	}
+
+	// -----------------------------
+	// 6. Resposta
+	// -----------------------------
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Agendamento atualizado com sucesso")
+	log.Printf("Agendamento atualizado com sucesso")
+}
