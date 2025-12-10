@@ -78,7 +78,7 @@ func main() {
 	authRouter.HandleFunc("/cadastrar-agendamento", handlers.AgendarCampo).Methods("POST")
 	authRouter.HandleFunc("/agendamentos", handlers.GetAgendamentos).Methods("GET")
 	authRouter.HandleFunc("/agendamentos/status", handlers.AtualizarStatusAgendamento).Methods("PUT")
-
+	authRouter.HandleFunc("/editar-agendamento", handlers.EditarAgendamento).Methods("PUT")
 	log.Printf("Servidor rodando em http://localhost:%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, c.Handler(r)))
 }
