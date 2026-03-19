@@ -6,11 +6,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/danpi/marca_ai_backend/internal/config"
 	"github.com/golang-jwt/jwt/v5"
 )
-
-// chave secreta (mesma usada no LoginHandler)
-var jwtKey = []byte("Tn9Jb2lfVGhpc19pc19hX3N0cm9uZ19qd3Rfa2V5X2ZvciB5b3Uh")
 
 // Context key segura
 type contextKey string
@@ -45,7 +43,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 		claims := &Claims{}
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			return jwtKey, nil
+			return config.JWTKey(), nil
 		})
 		if err != nil || !token.Valid {
 			http.Error(w, "Token inválido", http.StatusUnauthorized)

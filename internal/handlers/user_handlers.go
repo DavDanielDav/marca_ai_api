@@ -15,8 +15,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtKey = []byte("Tn9Jb2lfVGhpc19pc19hX3N0cm9uZ19qd3Rfa2V5X2ZvciB5b3Uh")
-
 func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -129,7 +127,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(jwtKey)
+	tokenString, err := token.SignedString(config.JWTKey())
 	if err != nil {
 		http.Error(w, "Erro ao gerar token", http.StatusInternalServerError)
 		return
