@@ -187,7 +187,7 @@ func GetDashboard(w http.ResponseWriter, r *http.Request) {
 		ProximosJogos: proximosJogos,
 		RankingCampos: rankingCampos,
 	}
-
+	log.Printf("DashboardDados")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
