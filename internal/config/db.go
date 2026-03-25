@@ -6,12 +6,12 @@ import (
 	"log"
 	"os"
 
-	_ "github.com/lib/pq" // Driver PostgreSQL
+	_ "github.com/lib/pq"
 )
 
 var DB *sql.DB
 
-// ConnectDB abre a conexão com o banco PostgreSQL
+// ConnectDB opens the PostgreSQL connection.
 func ConnectDB() {
 	dbHost := os.Getenv("DB_HOST")
 	dbPort := os.Getenv("DB_PORT")
@@ -27,13 +27,26 @@ func ConnectDB() {
 	var err error
 	DB, err = sql.Open("postgres", connStr)
 	if err != nil {
-		log.Fatalf("❌ Erro ao abrir conexão com o banco: %v", err)
+		log.Fatalf("Error opening database connection: %v", err)
 	}
 
 	err = DB.Ping()
 	if err != nil {
-		log.Fatalf("❌ Banco de dados não respondeu: %v", err)
+		log.Fatalf("Database did not respond: %v", err)
 	}
 
-	log.Println("✅ Conectado ao PostgreSQL com sucesso!")
+	if err := ensureForgotPasswordColumns(); err != nil {
+		log.Fatalf("Failed to ensure forgot-password columns: %v", err)
+	}
+
+	log.Println("Connected to PostgreSQL successfully")
+}
+
+func ensureForgotPasswordColumns() error {
+	_, err := DB.Exec(`
+		ALTER TABLE usuario
+		ADD COLUMN IF NOT EXISTS reset_code VARCHAR(6),
+		ADD COLUMN IF NOT EXISTS reset_expiry TIMESTAMPTZ
+	`)
+	return err
 }
