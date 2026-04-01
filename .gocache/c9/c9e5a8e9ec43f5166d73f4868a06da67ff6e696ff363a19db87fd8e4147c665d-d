@@ -1,0 +1,8 @@
+./agendamentos.go
+./apresentacaoArenasJogador.go
+./arena_handlers.go
+./cadastroCampo_handlers.go
+./campo_handlers.go
+./dashboard.go
+./email_code_handlers.go
+./user_handlers.go

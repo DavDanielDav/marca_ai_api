@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +22,13 @@ type Claims struct {
 	UsuarioID int    `json:"usuario_id"`
 	Email     string `json:"email"`
 	jwt.RegisteredClaims
+}
+
+type updateUsuarioRequest struct {
+	Username string
+	Email    string
+	Telefone string
+	Senha    string
 }
 
 var (
@@ -48,6 +56,60 @@ func validarEmail(email string) error {
 	}
 
 	return nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+
+	return ""
+}
+
+func stringFromJSONValue(value any) string {
+	switch v := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return strings.TrimSpace(v)
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(v)
+	default:
+		return strings.TrimSpace(fmt.Sprint(v))
+	}
+}
+
+func parseUpdateUsuarioRequest(r *http.Request) (updateUsuarioRequest, error) {
+	var payload map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		return updateUsuarioRequest{}, err
+	}
+
+	return updateUsuarioRequest{
+		Username: firstNonEmpty(
+			stringFromJSONValue(payload["username"]),
+			stringFromJSONValue(payload["nome"]),
+			stringFromJSONValue(payload["name"]),
+		),
+		Email: firstNonEmpty(
+			stringFromJSONValue(payload["email"]),
+		),
+		Telefone: firstNonEmpty(
+			stringFromJSONValue(payload["telefone"]),
+			stringFromJSONValue(payload["phone"]),
+		),
+		Senha: firstNonEmpty(
+			stringFromJSONValue(payload["senha"]),
+			stringFromJSONValue(payload["novaSenha"]),
+			stringFromJSONValue(payload["password"]),
+			stringFromJSONValue(payload["newPassword"]),
+		),
+	}, nil
 }
 
 func RegisterUsuarioHandler(w http.ResponseWriter, r *http.Request) {
@@ -130,11 +192,27 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user models.Usuario
-	err := config.DB.QueryRow("SELECT usua, nome, email, telefone FROM usuario WHERE id_cadastro=$1", userID).Scan(&user.ID, &user.Username, &user.Email, &user.Telefone)
+	var username, email, telefone sql.NullString
+	err := config.DB.QueryRow(
+		`SELECT usuario_id::text, nome, email, telefone
+		FROM usuario
+		WHERE usuario_id = $1`,
+		userID,
+	).Scan(&user.ID, &username, &email, &telefone)
 	if err != nil {
-		http.Error(w, "Usuario nao encontrado", http.StatusNotFound)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Usuario nao encontrado", http.StatusNotFound)
+			return
+		}
+
+		log.Printf("Erro ao buscar usuario %d: %v", userID, err)
+		http.Error(w, "Erro ao buscar usuario", http.StatusInternalServerError)
 		return
 	}
+
+	user.Username = username.String
+	user.Email = email.String
+	user.Telefone = telefone.String
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
@@ -147,44 +225,43 @@ func UpdateUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user models.Usuario
-	err := json.NewDecoder(r.Body).Decode(&user)
+	req, err := parseUpdateUsuarioRequest(r)
 	if err != nil {
 		http.Error(w, "Corpo da requisicao invalido", http.StatusBadRequest)
 		return
 	}
 
-	if strings.TrimSpace(user.Username) == "" {
+	if req.Username == "" {
 		http.Error(w, "Requer Nome", http.StatusBadRequest)
 		return
 	}
-	if strings.TrimSpace(user.Email) == "" {
+	if req.Email == "" {
 		http.Error(w, "Requer Email", http.StatusBadRequest)
 		return
 	}
-	if err := validarEmail(user.Email); err != nil {
+	if err := validarEmail(req.Email); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if user.Senha != "" {
-		if err := validarSenha(user.Senha); err != nil {
+	if req.Senha != "" {
+		if err := validarSenha(req.Senha); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		hashedPassword, err := utils.HashSenha(user.Senha)
+		hashedPassword, err := utils.HashSenha(req.Senha)
 		if err != nil {
 			http.Error(w, "Erro ao processar senha", http.StatusInternalServerError)
 			return
 		}
 		_, err = config.DB.Exec(
-			"UPDATE usuario SET nome=$1, email=$2, telefone=$3, senha=$4 WHERE id_usuario=$5",
-			user.Username, user.Email, user.Telefone, hashedPassword, userID,
+			"UPDATE usuario SET nome=$1, email=$2, telefone=$3, senha=$4 WHERE usuario_id=$5",
+			req.Username, req.Email, req.Telefone, hashedPassword, userID,
 		)
 	} else {
 		_, err = config.DB.Exec(
-			"UPDATE usuario SET nome=$1, email=$2, telefone=$3 WHERE id_cadastro=$4",
-			user.Username, user.Email, user.Telefone, userID,
+			"UPDATE usuario SET nome=$1, email=$2, telefone=$3 WHERE usuario_id=$4",
+			req.Username, req.Email, req.Telefone, userID,
 		)
 	}
 
@@ -197,7 +274,15 @@ func UpdateUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Usuario com ID %d atualizado com sucesso!", userID)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Usuario atualizado com sucesso"})
+	json.NewEncoder(w).Encode(map[string]string{
+		"message":    "Usuario atualizado com sucesso",
+		"id_usuario": strconv.Itoa(userID),
+		"usuario_id": strconv.Itoa(userID),
+		"username":   req.Username,
+		"nome":       req.Username,
+		"email":      req.Email,
+		"telefone":   req.Telefone,
+	})
 }
 
 func DeleteUsuarioHandler(w http.ResponseWriter, r *http.Request) {
@@ -207,7 +292,7 @@ func DeleteUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := config.DB.Exec("DELETE FROM usuario WHERE id_usuario=$1", userID)
+	_, err := config.DB.Exec("DELETE FROM usuario WHERE usuario_id=$1", userID)
 	if err != nil {
 		log.Printf("Erro ao deletar usuario do banco: %v", err)
 		http.Error(w, "Erro ao deletar usuario", http.StatusInternalServerError)
