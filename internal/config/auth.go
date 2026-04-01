@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
 )
 
 func JWTKey() []byte {
@@ -28,4 +29,34 @@ func ResendFromEmail() string {
 		return "onboarding@resend.dev"
 	}
 	return from
+}
+
+func SMTPHost() string {
+	return os.Getenv("SMTP_HOST")
+}
+
+func SMTPPort() int {
+	port := os.Getenv("SMTP_PORT")
+	if port == "" {
+		return 587
+	}
+
+	parsed, err := strconv.Atoi(port)
+	if err != nil {
+		return 587
+	}
+
+	return parsed
+}
+
+func SMTPUser() string {
+	return os.Getenv("SMTP_USER")
+}
+
+func SMTPPass() string {
+	return os.Getenv("SMTP_PASS")
+}
+
+func SMTPFrom() string {
+	return os.Getenv("SMTP_FROM")
 }

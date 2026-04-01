@@ -152,7 +152,7 @@ func DeleteArena(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := config.DB.Exec("DELETE FROM arenas WHERE id_usuario=$1", userID)
+	_, err := config.DB.Exec("DELETE FROM arenas WHERE usuario_id=$1", userID)
 	if err != nil {
 		log.Printf("Erro ao deletar arena do banco: %v", err)
 		http.Error(w, "Erro ao deletar arena do banco", http.StatusInternalServerError)

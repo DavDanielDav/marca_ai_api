@@ -2,7 +2,7 @@ package models
 
 type Campo struct {
 	IDCampo      int    `json:"id_campo"`
-	Nome         string `json:"nome"`
+	Nome         string `json:"nome_campo"`
 	MaxJogadores int    `json:"max_jogadores"`
 	Modalidade   string `json:"modalidade"`
 	TipoCampo    string `json:"tipo_campo"`

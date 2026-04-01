@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"mime/multipart"
 	"os"
@@ -11,10 +12,20 @@ import (
 )
 
 func UploadCloudinary(file multipart.File, filename string) (string, error) {
+	cloudName := os.Getenv("CLOUDINARY_CLOUD_NAME")
+	apiKey := os.Getenv("CLOUDINARY_API_KEY")
+	apiSecret := os.Getenv("CLOUDINARY_API_SECRET")
+
+	if cloudName == "" || apiKey == "" || apiSecret == "" {
+		err := fmt.Errorf("cloudinary nao configurado: defina CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET")
+		log.Print(err)
+		return "", err
+	}
+
 	cld, err := cloudinary.NewFromParams(
-		os.Getenv("CLOUDINARY_CLOUD_NAME"),
-		os.Getenv("CLOUDINARY_API_KEY"),
-		os.Getenv("CLOUDINARY_API_SECRET"),
+		cloudName,
+		apiKey,
+		apiSecret,
 	)
 	if err != nil {
 		log.Printf("erro ao conectar ao Cloudinary: %v", err)

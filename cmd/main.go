@@ -21,6 +21,7 @@ func getAllowedOrigins() []string {
 		return []string{
 			"http://localhost:5173",
 			"http://localhost:5174",
+			"https://marca-ai.onrender.com",
 		}
 	}
 
@@ -37,6 +38,8 @@ func getAllowedOrigins() []string {
 		return []string{
 			"http://localhost:5173",
 			"http://localhost:5174",
+			"https://marca-ai.onrender.com",
+			"http://10.0.50.7:5173/",
 		}
 	}
 
@@ -44,10 +47,13 @@ func getAllowedOrigins() []string {
 }
 
 func main() {
-	// Load environment variables from .env when available.
-	err := godotenv.Load()
+	// Load environment variables from either the backend folder or the current working directory.
+	err := godotenv.Load("backend/.env")
 	if err != nil {
-		log.Println("Warning: .env file not found, using system environment variables")
+		err = godotenv.Load()
+		if err != nil {
+			log.Println("Warning: .env file not found, using system environment variables")
+		}
 	}
 
 	r := mux.NewRouter().StrictSlash(true)
@@ -61,6 +67,7 @@ func main() {
 	})
 
 	config.ConnectDB()
+	config.EnsureEmailCodesTable()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -77,9 +84,12 @@ func main() {
 	}).Methods("GET")
 
 	r.HandleFunc("/cadastro", handlers.RegisterUsuarioHandler).Methods("POST")
+	r.HandleFunc("/cadastro/confirmar-codigo", handlers.ConfirmSignupCode).Methods("POST")
+	r.HandleFunc("/cadastro/reenviar-codigo", handlers.ResendSignupCode).Methods("POST")
 	r.HandleFunc("/login", handlers.LoginHandler).Methods("POST")
-	r.HandleFunc("/forgot-password/send-code", handlers.SendResetCodeHandler).Methods("POST")
-	r.HandleFunc("/forgot-password/verify-code", handlers.VerifyResetCodeHandler).Methods("POST")
+	r.HandleFunc("/forgot-password/send-code", handlers.SendForgotPasswordCode).Methods("POST")
+	r.HandleFunc("/forgot-password/verify-code", handlers.VerifyForgotPasswordCode).Methods("POST")
+	r.HandleFunc("/forgot-password/reset-password", handlers.ResetForgotPassword).Methods("POST")
 	r.HandleFunc("/ajogador", handlers.GetArenasJogador).Methods("GET")
 
 	authRouter := r.PathPrefix("").Subrouter()
