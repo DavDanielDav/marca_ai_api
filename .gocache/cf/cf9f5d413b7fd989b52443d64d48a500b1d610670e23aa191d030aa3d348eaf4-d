@@ -1,0 +1,10 @@
+./agendamentos.go
+./apresentacaoArenasJogador.go
+./arena_handlers.go
+./auth_helpers.go
+./cadastroCampo_handlers.go
+./campo_handlers.go
+./dashboard.go
+./email_code_handlers.go
+./google_auth_handlers.go
+./user_handlers.go

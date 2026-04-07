@@ -1,5 +1,0 @@
-./api.go
-./auth_token.go
-./cloud.go
-./configuration.go
-./url.go

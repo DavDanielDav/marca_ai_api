@@ -15,32 +15,49 @@ import (
 	"github.com/rs/cors"
 )
 
+func defaultAllowedOrigins() []string {
+	return []string{
+		"http://localhost:5173",
+		"http://localhost:5174",
+		"https://marca-ai.onrender.com",
+		"http://10.0.50.7:5173",
+		"https://*.brs.devtunnels.ms",
+		"https://trds5n8z-5173.brs.devtunnels.ms",
+	}
+}
+
+func normalizeOrigins(origins []string) []string {
+	normalized := make([]string, 0, len(origins))
+	seen := make(map[string]struct{}, len(origins))
+
+	for _, origin := range origins {
+		origin = strings.TrimRight(strings.TrimSpace(origin), "/")
+		if origin == "" {
+			continue
+		}
+
+		if _, exists := seen[origin]; exists {
+			continue
+		}
+
+		seen[origin] = struct{}{}
+		normalized = append(normalized, origin)
+	}
+
+	return normalized
+}
+
 func getAllowedOrigins() []string {
 	originsFromEnv := strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGINS"))
 	if originsFromEnv == "" {
-		return []string{
-			"http://localhost:5173",
-			"http://localhost:5174",
-			"https://marca-ai.onrender.com",
-		}
+		return defaultAllowedOrigins()
 	}
 
 	parts := strings.Split(originsFromEnv, ",")
-	origins := make([]string, 0, len(parts))
-	for _, part := range parts {
-		origin := strings.TrimSpace(part)
-		if origin != "" {
-			origins = append(origins, origin)
-		}
-	}
+	origins := normalizeOrigins(parts)
 
 	if len(origins) == 0 {
-		return []string{
-			"http://localhost:5173",
-			"http://localhost:5174",
-			"https://marca-ai.onrender.com",
-			"http://10.0.50.7:5173/",
-		}
+		return defaultAllowedOrigins()
 	}
 
 	return origins
