@@ -87,6 +87,7 @@ func main() {
 	r.HandleFunc("/cadastro/confirmar-codigo", handlers.ConfirmSignupCode).Methods("POST")
 	r.HandleFunc("/cadastro/reenviar-codigo", handlers.ResendSignupCode).Methods("POST")
 	r.HandleFunc("/login", handlers.LoginHandler).Methods("POST")
+	r.HandleFunc("/auth/google", handlers.GoogleAuthHandler).Methods("POST")
 	r.HandleFunc("/forgot-password/send-code", handlers.SendForgotPasswordCode).Methods("POST")
 	r.HandleFunc("/forgot-password/verify-code", handlers.VerifyForgotPasswordCode).Methods("POST")
 	r.HandleFunc("/forgot-password/reset-password", handlers.ResetForgotPassword).Methods("POST")

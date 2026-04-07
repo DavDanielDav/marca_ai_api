@@ -15,6 +15,15 @@ func JWTKey() []byte {
 	return []byte(secret)
 }
 
+func GoogleClientID() string {
+	clientID := os.Getenv("GOOGLE_CLIENT_ID")
+	if clientID == "" {
+		log.Fatal("GOOGLE_CLIENT_ID nao configurado")
+	}
+
+	return clientID
+}
+
 func ResendKey() string {
 	key := os.Getenv("RESEND_API_KEY")
 	if key == "" {

@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/danpi/marca_ai_backend/internal/config"
 	"github.com/danpi/marca_ai_backend/internal/middleware"
@@ -158,30 +157,13 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expirationTime := time.Now().Add(1 * time.Hour)
-	claims := &Claims{
-		Email:     creds.Email,
-		UsuarioID: userID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(config.JWTKey())
+	tokenString, err := issueAuthToken(userEmail, userID)
 	if err != nil {
 		http.Error(w, "Erro ao gerar token", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message":    "Logado com sucesso!!",
-		"token":      tokenString,
-		"usuario_id": userID,
-		"id_usuario": userID,
-	})
+	writeAuthSuccess(w, "Logado com sucesso!!", userID, tokenString)
 }
 
 func GetUserHandler(w http.ResponseWriter, r *http.Request) {
