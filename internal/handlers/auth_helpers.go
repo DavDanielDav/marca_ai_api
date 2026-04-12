@@ -10,17 +10,22 @@ import (
 )
 
 func issueAuthToken(email string, userID int) (string, error) {
+	jwtKey, err := config.JWTKey()
+	if err != nil {
+		return "", err
+	}
+
 	expirationTime := time.Now().Add(1 * time.Hour)
 	claims := &Claims{
 		Email:     email,
-		UsuarioID: userID,
+		IDUsuario: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(config.JWTKey())
+	return token.SignedString(jwtKey)
 }
 
 func writeAuthSuccess(w http.ResponseWriter, message string, userID int, token string) {
@@ -29,7 +34,6 @@ func writeAuthSuccess(w http.ResponseWriter, message string, userID int, token s
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"message":    message,
 		"token":      token,
-		"usuario_id": userID,
 		"id_usuario": userID,
 	})
 }

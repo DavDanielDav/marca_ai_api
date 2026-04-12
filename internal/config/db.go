@@ -23,20 +23,67 @@ func envOrDefault(key, fallback string) string {
 	return value
 }
 
-func buildPostgresDSN() (string, error) {
+func IsRenderEnvironment() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("RENDER")), "true") ||
+		strings.TrimSpace(os.Getenv("RENDER_EXTERNAL_HOSTNAME")) != ""
+}
+
+func isLocalDatabaseHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if host == "" {
+		return false
+	}
+
+	switch host {
+	case "localhost", "127.0.0.1", "::1", "0.0.0.0", "host.docker.internal":
+		return true
+	}
+
+	return strings.HasSuffix(host, ".local")
+}
+
+func inferSSLMode(host string) string {
+	if explicit := strings.TrimSpace(os.Getenv("DB_SSLMODE")); explicit != "" {
+		return explicit
+	}
+
+	if IsRenderEnvironment() {
+		return "require"
+	}
+
+	if isLocalDatabaseHost(host) {
+		return "disable"
+	}
+
+	if ip := net.ParseIP(host); ip != nil {
+		if ip.IsLoopback() {
+			return "disable"
+		}
+
+		return "disable"
+	}
+
+	if strings.Contains(host, ".") {
+		return "require"
+	}
+
+	return "disable"
+}
+
+func buildPostgresDSN() (string, string, error) {
 	if databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL")); databaseURL != "" {
 		parsedURL, err := url.Parse(databaseURL)
 		if err != nil {
-			return "", fmt.Errorf("DATABASE_URL invalida: %w", err)
+			return "", "", fmt.Errorf("DATABASE_URL invalida: %w", err)
 		}
 
 		query := parsedURL.Query()
 		if query.Get("sslmode") == "" {
-			query.Set("sslmode", envOrDefault("DB_SSLMODE", "disable"))
+			query.Set("sslmode", inferSSLMode(parsedURL.Hostname()))
 			parsedURL.RawQuery = query.Encode()
 		}
 
-		return parsedURL.String(), nil
+		return parsedURL.String(), "DATABASE_URL", nil
 	}
 
 	host := strings.TrimSpace(os.Getenv("DB_HOST"))
@@ -45,7 +92,7 @@ func buildPostgresDSN() (string, error) {
 	password := os.Getenv("DB_PASSWORD")
 	name := strings.TrimSpace(os.Getenv("DB_NAME"))
 
-	missing := make([]string, 0, 4)
+	missing := make([]string, 0, 5)
 	if host == "" {
 		missing = append(missing, "DB_HOST")
 	}
@@ -60,7 +107,10 @@ func buildPostgresDSN() (string, error) {
 	}
 
 	if len(missing) > 0 {
-		return "", fmt.Errorf("variaveis do banco ausentes: %s", strings.Join(missing, ", "))
+		return "", "", fmt.Errorf(
+			"configuracao do banco ausente: defina DATABASE_URL ou as variaveis DB_HOST, DB_PORT, DB_USER e DB_NAME; use DB_PASSWORD quando o seu banco exigir. Faltando: %s",
+			strings.Join(missing, ", "),
+		)
 	}
 
 	connectionURL := &url.URL{
@@ -71,16 +121,16 @@ func buildPostgresDSN() (string, error) {
 	}
 
 	query := connectionURL.Query()
-	query.Set("sslmode", envOrDefault("DB_SSLMODE", "disable"))
+	query.Set("sslmode", inferSSLMode(host))
 	connectionURL.RawQuery = query.Encode()
 
-	return connectionURL.String(), nil
+	return connectionURL.String(), "DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME", nil
 }
 
 func ConnectDB() {
-	dsn, err := buildPostgresDSN()
+	dsn, source, err := buildPostgresDSN()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("erro de configuracao do banco: %v", err)
 	}
 
 	DB, err = sql.Open("pgx", dsn)
@@ -93,7 +143,7 @@ func ConnectDB() {
 		log.Fatalf("banco de dados nao respondeu: %v", err)
 	}
 
-	log.Println("conectado ao PostgreSQL com sucesso")
+	log.Printf("conectado ao PostgreSQL com sucesso usando %s", source)
 }
 
 func EnsureEmailCodesTable() {

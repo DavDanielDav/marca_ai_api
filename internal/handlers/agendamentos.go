@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -38,6 +39,20 @@ type AgendamentoResponse struct {
 	CriadoEm  string `json:"criado_em"`
 	NomeCampo string `json:"nome_campo"`
 	NomeArena string `json:"nome_arena"`
+}
+
+type agendamentoRow struct {
+	ID        sql.NullInt64
+	IDUsuario sql.NullInt64
+	IDCampo   sql.NullInt64
+	Horario   sql.NullTime
+	Jogadores sql.NullInt64
+	Pagamento sql.NullString
+	Pago      sql.NullBool
+	Status    sql.NullString
+	CriadoEm  sql.NullTime
+	NomeCampo sql.NullString
+	NomeArena sql.NullString
 }
 
 func AgendarCampo(w http.ResponseWriter, r *http.Request) {
@@ -175,7 +190,7 @@ func GetAgendamentos(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 		SELECT 
-			a.id, a.id_usuario, a.id_campo, a.horario, a.jogadores, a.pagamento, 
+			a.id_agendamento, a.id_usuario, a.id_campo, a.horario, a.jogadores, a.pagamento, 
 			a.pago, a.status, a.criado_em, c.nome_campo, ar.nome AS nome_arena
 		FROM agendamentos a
 		JOIN campo c ON a.id_campo = c.id_campo
@@ -191,10 +206,10 @@ func GetAgendamentos(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var response []AgendamentoResponse
+	response := make([]AgendamentoResponse, 0)
 
 	for rows.Next() {
-		var ag AgendamentoRequest
+		var ag agendamentoRow
 
 		if err := rows.Scan(
 			&ag.ID, &ag.IDUsuario, &ag.IDCampo, &ag.Horario,
@@ -225,19 +240,34 @@ func GetAgendamentos(w http.ResponseWriter, r *http.Request) {
 			ag.NomeArena,
 		)*/
 
+		horario := ""
+		if ag.Horario.Valid {
+			horario = ag.Horario.Time.Format(time.RFC3339)
+		}
+
+		criadoEm := ""
+		if ag.CriadoEm.Valid {
+			criadoEm = ag.CriadoEm.Time.Format(time.RFC3339)
+		}
+
 		response = append(response, AgendamentoResponse{
-			ID:        ag.ID,
-			IDUsuario: ag.IDUsuario,
-			IDCampo:   ag.IDCampo,
-			Horario:   ag.Horario.Format(time.RFC3339),
-			Jogadores: ag.Jogadores,
-			Pagamento: ag.Pagamento,
-			Pago:      ag.Pago,
-			Status:    ag.Status,
-			CriadoEm:  ag.CriadoEm.Format(time.RFC3339),
-			NomeCampo: ag.NomeCampo,
-			NomeArena: ag.NomeArena,
+			ID:        int(ag.ID.Int64),
+			IDUsuario: int(ag.IDUsuario.Int64),
+			IDCampo:   int(ag.IDCampo.Int64),
+			Horario:   horario,
+			Jogadores: int(ag.Jogadores.Int64),
+			Pagamento: ag.Pagamento.String,
+			Pago:      ag.Pago.Bool,
+			Status:    ag.Status.String,
+			CriadoEm:  criadoEm,
+			NomeCampo: ag.NomeCampo.String,
+			NomeArena: ag.NomeArena.String,
 		})
+	}
+
+	if err := rows.Err(); err != nil {
+		http.Error(w, "Erro ao iterar agendamentos", http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -264,7 +294,7 @@ func AtualizarStatusAgendamento(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := config.DB.Exec(`UPDATE agendamentos SET status = $1 WHERE id = $2`, body.Status, id)
+	_, err := config.DB.Exec(`UPDATE agendamentos SET status = $1 WHERE id_agendamento = $2`, body.Status, id)
 	if err != nil {
 		http.Error(w, "Erro ao atualizar status", http.StatusInternalServerError)
 		return
@@ -334,7 +364,7 @@ func EditarAgendamento(w http.ResponseWriter, r *http.Request) {
         FROM agendamentos
         WHERE id_campo = $1
         AND horario = $2
-        AND id != $3
+        AND id_agendamento != $3
         AND status != 'cancelado'
     `, body.CampoID, horarioParsed, id).Scan(&count)
 
@@ -360,7 +390,7 @@ func EditarAgendamento(w http.ResponseWriter, r *http.Request) {
             jogadores = $3,
             pagamento = $4,
             pago = $5
-        WHERE id = $6
+        WHERE id_agendamento = $6
     `,
 		body.CampoID,
 		horarioParsed,

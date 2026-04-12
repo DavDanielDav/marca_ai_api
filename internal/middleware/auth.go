@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strings"
 
@@ -16,7 +17,7 @@ const UserIDKey contextKey = "userID"
 
 // Claims personalizados
 type Claims struct {
-	UsuarioID int    `json:"usuario_id"`
+	IDUsuario int    `json:"id_usuario"`
 	Email     string `json:"email,omitempty"`
 
 	jwt.RegisteredClaims
@@ -38,9 +39,16 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 		tokenString := parts[1]
 
+		jwtKey, err := config.JWTKey()
+		if err != nil {
+			log.Printf("erro de configuracao de autenticacao: %v", err)
+			http.Error(w, "Configuracao de autenticacao ausente", http.StatusInternalServerError)
+			return
+		}
+
 		claims := &Claims{}
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			return config.JWTKey(), nil
+			return jwtKey, nil
 		})
 		if err != nil || !token.Valid {
 			http.Error(w, "Token inválido", http.StatusUnauthorized)
@@ -48,7 +56,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Adiciona o ID ao contexto
-		ctx := context.WithValue(r.Context(), UserIDKey, claims.UsuarioID)
+		ctx := context.WithValue(r.Context(), UserIDKey, claims.IDUsuario)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

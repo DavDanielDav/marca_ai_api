@@ -11,18 +11,18 @@ import (
 	"github.com/danpi/marca_ai_backend/internal/handlers"
 	"github.com/danpi/marca_ai_backend/internal/middleware"
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
 	"github.com/rs/cors"
 )
 
 func defaultAllowedOrigins() []string {
 	return []string{
-		"http://localhost:5173",
-		"http://localhost:5174",
-		"https://marca-ai.onrender.com",
+		"http://localhost:*",
+		"https://*.onrender.com",
 		"http://10.0.50.7:5173",
 		"https://*.brs.devtunnels.ms",
-		"https://trds5n8z-5173.brs.devtunnels.ms",
+		"https://frontend-marcaai.onrender.com",
+		"https://www.arenas.marcaai.tec.br",
+		"https://arenas.marcaai.tec.br",
 	}
 }
 
@@ -48,13 +48,15 @@ func normalizeOrigins(origins []string) []string {
 }
 
 func getAllowedOrigins() []string {
+	origins := append([]string{}, defaultAllowedOrigins()...)
 	originsFromEnv := strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGINS"))
 	if originsFromEnv == "" {
-		return defaultAllowedOrigins()
+		return normalizeOrigins(origins)
 	}
 
 	parts := strings.Split(originsFromEnv, ",")
-	origins := normalizeOrigins(parts)
+	origins = append(origins, parts...)
+	origins = normalizeOrigins(origins)
 
 	if len(origins) == 0 {
 		return defaultAllowedOrigins()
@@ -64,17 +66,11 @@ func getAllowedOrigins() []string {
 }
 
 func main() {
-	// Load environment variables from either the backend folder or the current working directory.
-	err := godotenv.Load("backend/.env")
-	if err != nil {
-		err = godotenv.Load()
-		if err != nil {
-			log.Println("Warning: .env file not found, using system environment variables")
-		}
-	}
+	config.LoadEnv()
 
 	r := mux.NewRouter().StrictSlash(true)
 	allowedOrigins := getAllowedOrigins()
+	log.Printf("CORS allowed origins: %v", allowedOrigins)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,

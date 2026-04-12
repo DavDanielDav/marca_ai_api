@@ -1,41 +1,42 @@
 package config
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
-func JWTKey() []byte {
-	secret := os.Getenv("jwtKey")
-	if secret == "" {
-		log.Fatal("JWT_SECRET nao configurado")
+func requiredEnv(key string) (string, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return "", fmt.Errorf("%s nao configurado", key)
 	}
 
-	return []byte(secret)
+	return value, nil
 }
 
-func GoogleClientID() string {
-	clientID := os.Getenv("GOOGLE_CLIENT_ID")
-	if clientID == "" {
-		log.Fatal("GOOGLE_CLIENT_ID nao configurado")
+func JWTKey() ([]byte, error) {
+	secret, err := requiredEnv("jwtKey")
+	if err != nil {
+		return nil, err
 	}
 
-	return clientID
+	return []byte(secret), nil
 }
 
-func ResendKey() string {
-	key := os.Getenv("RESEND_API_KEY")
-	if key == "" {
-		log.Fatal("RESEND_API_KEY not configured")
-	}
-	return key
+func GoogleClientID() (string, error) {
+	return requiredEnv("GOOGLE_CLIENT_ID")
+}
+
+func ResendKey() (string, error) {
+	return requiredEnv("RESEND_API_KEY")
 }
 
 func ResendFromEmail() string {
 	from := os.Getenv("RESEND_FROM_EMAIL")
 	if from == "" {
-		return "onboarding@resend.dev"
+		return "marcaaisend@marcaai.tec.br"
 	}
 	return from
 }

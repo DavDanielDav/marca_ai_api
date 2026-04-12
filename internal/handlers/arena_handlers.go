@@ -72,7 +72,7 @@ func CadastrodeArena(w http.ResponseWriter, r *http.Request) {
 
 	// Salvar no DB
 	_, err = config.DB.Exec(
-		"INSERT INTO arenas (nome, cnpj, qtd_campos, tipo, imagem, endereco, usuario_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+		"INSERT INTO arenas (nome, cnpj, qtd_campos, tipo, imagem, endereco, id_usuario) VALUES ($1, $2, $3, $4, $5, $6, $7)",
 		newArena.Nome, newArena.Cnpj, newArena.QtdCampos, newArena.Tipo, newArena.Imagem, newArena.Endereco, userID,
 	)
 	if err != nil {
@@ -109,7 +109,7 @@ func GetArenas(w http.ResponseWriter, r *http.Request) {
 	rows, err := config.DB.Query(`
 		SELECT id, nome, qtd_campos, tipo, imagem, endereco
 		FROM arenas
-		WHERE usuario_id = $1
+		WHERE id_usuario = $1
 	`, userID)
 	if err != nil {
 		http.Error(w, "Erro ao buscar arenas", http.StatusInternalServerError)
@@ -152,7 +152,7 @@ func DeleteArena(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := config.DB.Exec("DELETE FROM arenas WHERE usuario_id=$1", userID)
+	_, err := config.DB.Exec("DELETE FROM arenas WHERE id_usuario=$1", userID)
 	if err != nil {
 		log.Printf("Erro ao deletar arena do banco: %v", err)
 		http.Error(w, "Erro ao deletar arena do banco", http.StatusInternalServerError)
@@ -213,7 +213,7 @@ func UpdateArena(w http.ResponseWriter, r *http.Request) {
 			tipo = COALESCE(NULLIF($4, ''), tipo),
 			endereco = COALESCE(NULLIF($5, ''), endereco),
 			imagem = COALESCE(NULLIF($6, ''), imagem)
-		WHERE usuario_id = $7
+		WHERE id_usuario = $7
 	`
 
 	_, err = config.DB.Exec(query,

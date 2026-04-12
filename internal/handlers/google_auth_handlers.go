@@ -51,7 +51,14 @@ func GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	profile, err := verifyGoogleCredential(r.Context(), req.Credential)
+	googleClientID, err := config.GoogleClientID()
+	if err != nil {
+		log.Printf("google auth unavailable: %v", err)
+		http.Error(w, "Login com Google nao configurado", http.StatusServiceUnavailable)
+		return
+	}
+
+	profile, err := verifyGoogleCredential(r.Context(), req.Credential, googleClientID)
 	if err != nil {
 		log.Printf("google auth verification failed: %v", err)
 		http.Error(w, "Google credential invalida", http.StatusUnauthorized)
@@ -85,7 +92,7 @@ func GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	writeAuthSuccess(w, "Autenticado com Google com sucesso!", userID, token)
 }
 
-func verifyGoogleCredential(parent context.Context, credential string) (googleProfile, error) {
+func verifyGoogleCredential(parent context.Context, credential string, googleClientID string) (googleProfile, error) {
 	kid, err := extractGoogleKeyID(credential)
 	if err != nil {
 		return googleProfile{}, err
@@ -113,7 +120,7 @@ func verifyGoogleCredential(parent context.Context, credential string) (googlePr
 		return googleProfile{}, errors.New("invalid google issuer")
 	}
 
-	if fmt.Sprint(claims["aud"]) != config.GoogleClientID() {
+	if fmt.Sprint(claims["aud"]) != googleClientID {
 		return googleProfile{}, errors.New("invalid google audience")
 	}
 
@@ -222,7 +229,7 @@ func googleEmailVerified(value any) bool {
 func findUserIDByEmail(email string) (int, error) {
 	var userID int
 	err := config.DB.QueryRow(
-		"SELECT usuario_id FROM usuario WHERE LOWER(email) = LOWER($1)",
+		"SELECT id_usuario FROM usuario WHERE LOWER(email) = LOWER($1)",
 		email,
 	).Scan(&userID)
 
@@ -237,7 +244,7 @@ func createGoogleUser(profile googleProfile) (int, error) {
 
 	var userID int
 	err = config.DB.QueryRow(
-		"INSERT INTO usuario (nome, email, senha) VALUES ($1, $2, $3) RETURNING usuario_id",
+		"INSERT INTO usuario (nome, email, senha) VALUES ($1, $2, $3) RETURNING id_usuario",
 		profile.Name,
 		profile.Email,
 		passwordHash,

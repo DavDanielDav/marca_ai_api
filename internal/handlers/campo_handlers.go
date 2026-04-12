@@ -52,7 +52,7 @@ func CadastrodeCampo(w http.ResponseWriter, r *http.Request) {
 	var pertence bool
 	err = config.DB.QueryRow(`
 		SELECT EXISTS (
-			SELECT 1 FROM arenas WHERE id = $1 AND usuario_id = $2
+			SELECT 1 FROM arenas WHERE id = $1 AND id_usuario = $2
 		)
 	`, idArena, userID).Scan(&pertence)
 	if err != nil {
@@ -122,7 +122,7 @@ func GetCampos(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ✅ Verifica se o usuário tem arenas
-	rowsArenas, err := config.DB.Query(`SELECT id FROM arenas WHERE usuario_id = $1`, userID)
+	rowsArenas, err := config.DB.Query(`SELECT id FROM arenas WHERE id_usuario = $1`, userID)
 	if err != nil {
 		http.Error(w, "Erro ao buscar arenas do usuário", http.StatusInternalServerError)
 		log.Printf("Erro ao buscar arenas: %v", err)
@@ -161,7 +161,7 @@ func GetCampos(w http.ResponseWriter, r *http.Request) {
 			a.nome AS nome_arena
 		FROM campo c
 		JOIN arenas a ON c.id_arena = a.id
-		WHERE a.usuario_id = $1;
+		WHERE a.id_usuario = $1;
 	`
 
 	rowsCampos, err := config.DB.Query(query, userID)
@@ -233,7 +233,7 @@ func UpdateCampo(w http.ResponseWriter, r *http.Request) {
         SELECT EXISTS (
             SELECT 1 FROM campo c
             JOIN arenas a ON c.id_arena = a.id
-            WHERE c.id_campo = $1 AND a.usuario_id = $2
+            WHERE c.id_campo = $1 AND a.id_usuario = $2
         )
     `, idCampo, userID).Scan(&pertence)
 
@@ -288,7 +288,7 @@ func DeleteCampo(w http.ResponseWriter, r *http.Request) {
         SELECT EXISTS (
             SELECT 1 FROM campo c
             JOIN arenas a ON c.id_arena = a.id
-            WHERE c.id_campo = $1 AND a.usuario_id = $2
+            WHERE c.id_campo = $1 AND a.id_usuario = $2
         )
     `, idCampo, userID).Scan(&pertence)
 

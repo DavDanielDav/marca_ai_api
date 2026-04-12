@@ -59,7 +59,7 @@ func GetDashboard(w http.ResponseWriter, r *http.Request) {
 			SELECT c.id_campo
 			FROM campo c
 			JOIN arenas a ON a.id = c.id_arena
-			WHERE a.usuario_id = $1
+			WHERE a.id_usuario = $1
 		)
 		SELECT
 			(SELECT COUNT(*) FROM campos_usuario) AS campos_cadastrados,
@@ -110,7 +110,7 @@ func GetDashboard(w http.ResponseWriter, r *http.Request) {
 		FROM agendamentos ag
 		JOIN campo c ON c.id_campo = ag.id_campo
 		JOIN arenas a ON a.id = c.id_arena
-		WHERE a.usuario_id = $1
+		WHERE a.id_usuario = $1
 		  AND ag.status = 'agendado'
 		  AND ag.horario >= NOW()
 		ORDER BY ag.horario ASC
@@ -147,7 +147,7 @@ func GetDashboard(w http.ResponseWriter, r *http.Request) {
 		FROM agendamentos ag
 		JOIN campo c ON c.id_campo = ag.id_campo
 		JOIN arenas a ON a.id = c.id_arena
-		WHERE a.usuario_id = $1
+		WHERE a.id_usuario = $1
 		  AND ag.status <> 'cancelado'
 		GROUP BY c.id_campo, c.nome_campo
 		ORDER BY reservas DESC, c.nome_campo ASC

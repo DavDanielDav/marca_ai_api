@@ -18,7 +18,7 @@ import (
 )
 
 type Claims struct {
-	UsuarioID int    `json:"usuario_id"`
+	IDUsuario int    `json:"id_usuario"`
 	Email     string `json:"email"`
 	jwt.RegisteredClaims
 }
@@ -138,7 +138,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var userID int
 	var userEmail, hashedPassword string
 	err = config.DB.QueryRow(
-		"SELECT usuario_id, email, senha FROM usuario WHERE email = $1",
+		"SELECT id_usuario, email, senha FROM usuario WHERE email = $1",
 		creds.Email,
 	).Scan(&userID, &userEmail, &hashedPassword)
 
@@ -176,9 +176,9 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 	var user models.Usuario
 	var username, email, telefone sql.NullString
 	err := config.DB.QueryRow(
-		`SELECT usuario_id::text, nome, email, telefone
+		`SELECT id_usuario::text, nome, email, telefone
 		FROM usuario
-		WHERE usuario_id = $1`,
+		WHERE id_usuario = $1`,
 		userID,
 	).Scan(&user.ID, &username, &email, &telefone)
 	if err != nil {
@@ -237,12 +237,12 @@ func UpdateUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, err = config.DB.Exec(
-			"UPDATE usuario SET nome=$1, email=$2, telefone=$3, senha=$4 WHERE usuario_id=$5",
+			"UPDATE usuario SET nome=$1, email=$2, telefone=$3, senha=$4 WHERE id_usuario=$5",
 			req.Username, req.Email, req.Telefone, hashedPassword, userID,
 		)
 	} else {
 		_, err = config.DB.Exec(
-			"UPDATE usuario SET nome=$1, email=$2, telefone=$3 WHERE usuario_id=$4",
+			"UPDATE usuario SET nome=$1, email=$2, telefone=$3 WHERE id_usuario=$4",
 			req.Username, req.Email, req.Telefone, userID,
 		)
 	}
@@ -259,7 +259,6 @@ func UpdateUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"message":    "Usuario atualizado com sucesso",
 		"id_usuario": strconv.Itoa(userID),
-		"usuario_id": strconv.Itoa(userID),
 		"username":   req.Username,
 		"nome":       req.Username,
 		"email":      req.Email,
@@ -274,7 +273,7 @@ func DeleteUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := config.DB.Exec("DELETE FROM usuario WHERE usuario_id=$1", userID)
+	_, err := config.DB.Exec("DELETE FROM usuario WHERE id_usuario=$1", userID)
 	if err != nil {
 		log.Printf("Erro ao deletar usuario do banco: %v", err)
 		http.Error(w, "Erro ao deletar usuario", http.StatusInternalServerError)
