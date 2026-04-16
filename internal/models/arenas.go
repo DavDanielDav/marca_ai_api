@@ -1,12 +1,16 @@
 package models
 
 type Arenas struct {
-	ID        int     `json:"id"`
-	Nome      string  `json:"nome"`
-	Cnpj      string  `json:"cnpj"`
-	QtdCampos int     `json:"qtdCampos"`
-	Tipo      string  `json:"tipo"`
-	Imagem    string  `json:"imagem"`
-	Endereco  string  `json:"endereco"`
-	Campos    []Campo `json:"campos,omitempty"`
+	ID                 int     `json:"id"`
+	Nome               string  `json:"nome"`
+	Cnpj               string  `json:"cnpj"`
+	QtdCampos          int     `json:"qtdCampos"`
+	Tipo               string  `json:"tipo"`
+	Imagem             string  `json:"imagem"`
+	Endereco           string  `json:"endereco"`
+	Observacoes        string  `json:"observacoes,omitempty"`
+	EsportesOferecidos string  `json:"esportes_oferecidos,omitempty"`
+	InformacoesArena   string  `json:"informacoes_arena,omitempty"`
+	EmManutencao       bool    `json:"em_manutencao"`
+	Campos             []Campo `json:"campos,omitempty"`
 }

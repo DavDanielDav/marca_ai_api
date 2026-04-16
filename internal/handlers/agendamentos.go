@@ -103,6 +103,21 @@ func AgendarCampo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	campoInfo, err := loadCampoDisponibilidadeInfo(agendamento.CampoID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Campo nao encontrado", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Erro ao verificar disponibilidade do campo", http.StatusInternalServerError)
+		return
+	}
+
+	if campoInfo.CampoEmManutencao || campoInfo.ArenaEmManutencao {
+		http.Error(w, "O campo selecionado esta indisponivel para agendamento", http.StatusConflict)
+		return
+	}
+
 	// --------------------------------------
 	// 4. Verifica se o horário já está ocupado
 	// --------------------------------------
@@ -371,6 +386,21 @@ func EditarAgendamento(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Erro ao verificar disponibilidade", http.StatusInternalServerError)
 		log.Printf("Erro ao verificar disponibilidade")
+		return
+	}
+
+	campoInfo, err := loadCampoDisponibilidadeInfo(body.CampoID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Campo nao encontrado", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Erro ao verificar disponibilidade do campo", http.StatusInternalServerError)
+		return
+	}
+
+	if campoInfo.CampoEmManutencao || campoInfo.ArenaEmManutencao {
+		http.Error(w, "O campo selecionado esta indisponivel para agendamento", http.StatusConflict)
 		return
 	}
 

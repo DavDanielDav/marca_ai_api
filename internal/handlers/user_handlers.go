@@ -14,14 +14,7 @@ import (
 	"github.com/danpi/marca_ai_backend/internal/middleware"
 	"github.com/danpi/marca_ai_backend/internal/models"
 	"github.com/danpi/marca_ai_backend/internal/utils"
-	"github.com/golang-jwt/jwt/v5"
 )
-
-type Claims struct {
-	IDUsuario int    `json:"id_usuario"`
-	Email     string `json:"email"`
-	jwt.RegisteredClaims
-}
 
 type updateUsuarioRequest struct {
 	Username string
@@ -133,6 +126,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	creds.Email = strings.TrimSpace(creds.Email)
+
+	release, err := middleware.AcquireEmailRequestSlot(r.Context(), creds.Email)
+	if err != nil {
+		return
+	}
+	defer release()
+
 	log.Printf("Login attempt for email: %s", creds.Email)
 
 	var userID int
@@ -157,13 +158,13 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenString, err := issueAuthToken(userEmail, userID)
+	tokenString, refreshToken, err := issueTokenPair(userEmail, userID)
 	if err != nil {
 		http.Error(w, "Erro ao gerar token", http.StatusInternalServerError)
 		return
 	}
 
-	writeAuthSuccess(w, "Logado com sucesso!!", userID, tokenString)
+	writeAuthSuccess(w, "Logado com sucesso!!", userID, tokenString, refreshToken)
 }
 
 func GetUserHandler(w http.ResponseWriter, r *http.Request) {

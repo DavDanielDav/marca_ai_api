@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/danpi/marca_ai_backend/internal/config"
+	"github.com/danpi/marca_ai_backend/internal/middleware"
 	"github.com/danpi/marca_ai_backend/internal/models"
 	"github.com/danpi/marca_ai_backend/internal/utils"
 )
@@ -72,6 +73,12 @@ func StartSignupVerification(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	release, err := middleware.AcquireEmailRequestSlot(r.Context(), req.Email)
+	if err != nil {
+		return
+	}
+	defer release()
 
 	exists, err := userEmailExists(req.Email)
 	if err != nil {
@@ -136,6 +143,12 @@ func ConfirmSignupCode(w http.ResponseWriter, r *http.Request) {
 	req.Email = strings.TrimSpace(req.Email)
 	req.Code = strings.TrimSpace(req.Code)
 
+	release, err := middleware.AcquireEmailRequestSlot(r.Context(), req.Email)
+	if err != nil {
+		return
+	}
+	defer release()
+
 	record, err := validateEmailCode(req.Email, codePurposeSignup, req.Code)
 	if err != nil {
 		writeCodeError(w, err)
@@ -194,6 +207,12 @@ func ResendSignupCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	release, err := middleware.AcquireEmailRequestSlot(r.Context(), req.Email)
+	if err != nil {
+		return
+	}
+	defer release()
+
 	record, err := getEmailCode(req.Email, codePurposeSignup)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -244,6 +263,12 @@ func SendForgotPasswordCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	release, err := middleware.AcquireEmailRequestSlot(r.Context(), req.Email)
+	if err != nil {
+		return
+	}
+	defer release()
+
 	exists, err := userEmailExists(req.Email)
 	if err != nil {
 		http.Error(w, "Erro ao verificar email", http.StatusInternalServerError)
@@ -293,6 +318,12 @@ func VerifyForgotPasswordCode(w http.ResponseWriter, r *http.Request) {
 	req.Email = strings.TrimSpace(req.Email)
 	req.Code = strings.TrimSpace(req.Code)
 
+	release, err := middleware.AcquireEmailRequestSlot(r.Context(), req.Email)
+	if err != nil {
+		return
+	}
+	defer release()
+
 	if _, err := validateEmailCode(req.Email, codePurposePasswordReset, req.Code); err != nil {
 		writeCodeError(w, err)
 		return
@@ -326,6 +357,13 @@ func ResetForgotPassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	release, err := middleware.AcquireEmailRequestSlot(r.Context(), req.Email)
+	if err != nil {
+		return
+	}
+	defer release()
+
 	if _, err := validateEmailCode(req.Email, codePurposePasswordReset, req.Code); err != nil {
 		writeCodeError(w, err)
 		return

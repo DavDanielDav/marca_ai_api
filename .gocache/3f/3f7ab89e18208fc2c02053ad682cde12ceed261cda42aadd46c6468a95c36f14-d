@@ -1,0 +1,17 @@
+./agendamentos.go
+./apresentacaoArenasJogador.go
+./arena_handlers.go
+./arena_schema.go
+./auth_helpers.go
+./cadastroCampo_handlers.go
+./campo_handlers.go
+./campo_schema.go
+./dashboard.go
+./email_code_handlers.go
+./google_auth_handlers.go
+./refresh_token_handler.go
+./user_handlers.go
+./arena_schema_test.go
+./campo_handlers_test.go
+./campo_schema_test.go
+./refresh_token_handler_test.go

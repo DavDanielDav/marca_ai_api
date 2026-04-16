@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/danpi/marca_ai_backend/internal/config"
+	"github.com/danpi/marca_ai_backend/internal/middleware"
 	"github.com/danpi/marca_ai_backend/internal/utils"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -65,6 +66,12 @@ func GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	release, err := middleware.AcquireEmailRequestSlot(r.Context(), profile.Email)
+	if err != nil {
+		return
+	}
+	defer release()
+
 	userID, err := findUserIDByEmail(profile.Email)
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("google auth database lookup failed: %v", err)
@@ -83,13 +90,13 @@ func GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 		_ = deleteEmailCode(profile.Email, codePurposeSignup)
 	}
 
-	token, err := issueAuthToken(profile.Email, userID)
+	token, refreshToken, err := issueTokenPair(profile.Email, userID)
 	if err != nil {
 		http.Error(w, "Erro ao gerar token", http.StatusInternalServerError)
 		return
 	}
 
-	writeAuthSuccess(w, "Autenticado com Google com sucesso!", userID, token)
+	writeAuthSuccess(w, "Autenticado com Google com sucesso!", userID, token, refreshToken)
 }
 
 func verifyGoogleCredential(parent context.Context, credential string, googleClientID string) (googleProfile, error) {
