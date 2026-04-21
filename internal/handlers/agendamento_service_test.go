@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/danpi/marca_ai_backend/internal/models"
 )
@@ -55,5 +56,13 @@ func TestStatusAfterCronometroEncerradoDependsOnRemainingValue(t *testing.T) {
 
 	if got := statusAfterCronometroEncerrado(0); got != models.AgendamentoStatusAgendado {
 		t.Fatalf("expected agendado status when remaining is zero, got %q", got)
+	}
+}
+
+func TestAgendamentoLocationUsesSaoPauloOffset(t *testing.T) {
+	location := agendamentoLocation()
+	_, offset := time.Date(2026, time.April, 21, 12, 0, 0, 0, location).Zone()
+	if offset != -3*60*60 {
+		t.Fatalf("expected Sao Paulo offset -03:00, got %d", offset)
 	}
 }

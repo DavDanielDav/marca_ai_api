@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/danpi/marca_ai_backend/internal/models"
 )
@@ -202,7 +201,7 @@ func (service agendamentoService) IniciarCronometro(ctx context.Context, ownerUs
 		return models.Agendamento{}, errAgendamentoEstadoOperacaoInvalido
 	}
 
-	inicioUnix := time.Now().Unix()
+	inicioUnix := agendamentoNow().Unix()
 	if err := service.repository.startCronometro(ctx, agendamentoID, inicioUnix); err != nil {
 		return models.Agendamento{}, err
 	}
@@ -235,7 +234,7 @@ func (service agendamentoService) EncerrarCronometro(ctx context.Context, ownerU
 	}
 
 	nextStatus := statusAfterCronometroEncerrado(agendamento.ValorRestante)
-	fim := time.Now()
+	fim := agendamentoNow()
 	if err := service.repository.finishCronometro(ctx, agendamentoID, fim, nextStatus); err != nil {
 		return models.Agendamento{}, err
 	}

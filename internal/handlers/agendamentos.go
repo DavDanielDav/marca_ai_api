@@ -534,10 +534,7 @@ func parsePagamentoAgendamentoRequest(r *http.Request) (models.RegistrarPagament
 }
 
 func parseAgendamentoHorario(raw string) (time.Time, error) {
-	location, err := time.LoadLocation("America/Sao_Paulo")
-	if err != nil {
-		return time.Time{}, err
-	}
+	location := agendamentoLocation()
 
 	raw = strings.TrimSpace(raw)
 	layouts := []string{

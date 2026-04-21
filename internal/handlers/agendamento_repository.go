@@ -138,6 +138,7 @@ func (agendamentoRepository) hasScheduleConflict(ctx context.Context, campoID in
 }
 
 func (agendamentoRepository) create(ctx context.Context, input models.CreateAgendamentoInput, status models.AgendamentoStatus, valorTotal float64, valorRestante float64) (models.Agendamento, error) {
+	createdAt := agendamentoNow()
 	query := fmt.Sprintf(`
 		INSERT INTO %s (
 			id_usuario,
@@ -146,6 +147,7 @@ func (agendamentoRepository) create(ctx context.Context, input models.CreateAgen
 			jogadores,
 			pagamento,
 			pago,
+			criado_em,
 			nome_solicitante,
 			status,
 			status_de_pagamento,
@@ -156,8 +158,8 @@ func (agendamentoRepository) create(ctx context.Context, input models.CreateAgen
 			time2,
 			modo_de_jogo
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, ''), $8, $9, $10, $11, $12, NULLIF($13, ''), NULLIF($14, ''), NULLIF($15, ''))
-		RETURNING id_agendamento, COALESCE(criado_em, NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, ''), $9, $10, $11, $12, $13, NULLIF($14, ''), NULLIF($15, ''), NULLIF($16, ''))
+		RETURNING id_agendamento, criado_em
 	`, agendamentosTableName())
 
 	var agendamento models.Agendamento
@@ -170,6 +172,7 @@ func (agendamentoRepository) create(ctx context.Context, input models.CreateAgen
 		input.Jogadores,
 		input.Pagamento,
 		input.Pago,
+		createdAt,
 		input.NomeSolicitante,
 		string(status),
 		input.Pago,
@@ -348,6 +351,7 @@ func (agendamentoRepository) updateFinancialState(ctx context.Context, agendamen
 }
 
 func (agendamentoRepository) insertPayment(ctx context.Context, agendamentoID int, input models.RegistrarPagamentoInput) (models.AgendamentoPagamento, error) {
+	dataPagamento := agendamentoNow()
 	query := fmt.Sprintf(`
 		INSERT INTO %s (
 			id_agendamento,
@@ -356,7 +360,7 @@ func (agendamentoRepository) insertPayment(ctx context.Context, agendamentoID in
 			forma_pagamento,
 			data_pagamento
 		)
-		VALUES ($1, $2, $3, $4, NOW())
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, data_pagamento
 	`, pagamentosPorAgendamentoTableName())
 
@@ -368,6 +372,7 @@ func (agendamentoRepository) insertPayment(ctx context.Context, agendamentoID in
 		nullableIntValue(input.IDUsuario),
 		input.ValorPago,
 		input.FormaPagamento,
+		dataPagamento,
 	).Scan(&pagamento.ID, &pagamento.DataPagamento)
 	if err != nil {
 		return models.AgendamentoPagamento{}, err
