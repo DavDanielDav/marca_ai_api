@@ -139,7 +139,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var userID int
 	var userEmail, hashedPassword string
 	err = config.DB.QueryRow(
-		"SELECT id_usuario, email, senha FROM usuario WHERE email = $1",
+		fmt.Sprintf("SELECT id_usuario, email, senha FROM %s WHERE email = $1", usuarioTableName()),
 		creds.Email,
 	).Scan(&userID, &userEmail, &hashedPassword)
 
@@ -176,12 +176,12 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	var user models.Usuario
 	var username, email, telefone sql.NullString
-	err := config.DB.QueryRow(
+	err := config.DB.QueryRow(fmt.Sprintf(
 		`SELECT id_usuario::text, nome, email, telefone
-		FROM usuario
+		FROM %s
 		WHERE id_usuario = $1`,
-		userID,
-	).Scan(&user.ID, &username, &email, &telefone)
+		usuarioTableName(),
+	), userID).Scan(&user.ID, &username, &email, &telefone)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "Usuario nao encontrado", http.StatusNotFound)
@@ -238,12 +238,12 @@ func UpdateUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, err = config.DB.Exec(
-			"UPDATE usuario SET nome=$1, email=$2, telefone=$3, senha=$4 WHERE id_usuario=$5",
+			fmt.Sprintf("UPDATE %s SET nome=$1, email=$2, telefone=$3, senha=$4 WHERE id_usuario=$5", usuarioTableName()),
 			req.Username, req.Email, req.Telefone, hashedPassword, userID,
 		)
 	} else {
 		_, err = config.DB.Exec(
-			"UPDATE usuario SET nome=$1, email=$2, telefone=$3 WHERE id_usuario=$4",
+			fmt.Sprintf("UPDATE %s SET nome=$1, email=$2, telefone=$3 WHERE id_usuario=$4", usuarioTableName()),
 			req.Username, req.Email, req.Telefone, userID,
 		)
 	}
@@ -274,7 +274,7 @@ func DeleteUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := config.DB.Exec("DELETE FROM usuario WHERE id_usuario=$1", userID)
+	_, err := config.DB.Exec(fmt.Sprintf("DELETE FROM %s WHERE id_usuario=$1", usuarioTableName()), userID)
 	if err != nil {
 		log.Printf("Erro ao deletar usuario do banco: %v", err)
 		http.Error(w, "Erro ao deletar usuario", http.StatusInternalServerError)

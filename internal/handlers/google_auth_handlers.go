@@ -236,7 +236,7 @@ func googleEmailVerified(value any) bool {
 func findUserIDByEmail(email string) (int, error) {
 	var userID int
 	err := config.DB.QueryRow(
-		"SELECT id_usuario FROM usuario WHERE LOWER(email) = LOWER($1)",
+		fmt.Sprintf("SELECT id_usuario FROM %s WHERE LOWER(email) = LOWER($1)", usuarioTableName()),
 		email,
 	).Scan(&userID)
 
@@ -251,7 +251,7 @@ func createGoogleUser(profile googleProfile) (int, error) {
 
 	var userID int
 	err = config.DB.QueryRow(
-		"INSERT INTO usuario (nome, email, senha) VALUES ($1, $2, $3) RETURNING id_usuario",
+		fmt.Sprintf("INSERT INTO %s (nome, email, senha) VALUES ($1, $2, $3) RETURNING id_usuario", usuarioTableName()),
 		profile.Name,
 		profile.Email,
 		passwordHash,
