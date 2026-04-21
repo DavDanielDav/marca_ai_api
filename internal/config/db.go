@@ -8,11 +8,78 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"unicode"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 var DB *sql.DB
+
+func sanitizeIdentifier(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+
+	for _, char := range value {
+		if char != '_' && !unicode.IsLetter(char) && !unicode.IsDigit(char) {
+			return ""
+		}
+	}
+
+	return value
+}
+
+func quoteIdentifier(value string) string {
+	return `"` + strings.ReplaceAll(value, `"`, `""`) + `"`
+}
+
+func DBSchemaName() string {
+	if schema := sanitizeIdentifier(os.Getenv("DB_SCHEMA")); schema != "" {
+		return schema
+	}
+
+	return "arena"
+}
+
+func QualifiedName(name string) string {
+	return fmt.Sprintf("%s.%s", quoteIdentifier(DBSchemaName()), quoteIdentifier(strings.TrimSpace(name)))
+}
+
+func normalizeSearchPath(value string) string {
+	parts := strings.Split(value, ",")
+	normalized := make([]string, 0, len(parts))
+	seen := make(map[string]struct{}, len(parts))
+
+	for _, part := range parts {
+		schema := strings.TrimSpace(part)
+		if schema == "" {
+			continue
+		}
+
+		key := strings.ToLower(schema)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+
+		seen[key] = struct{}{}
+		normalized = append(normalized, schema)
+	}
+
+	return strings.Join(normalized, ",")
+}
+
+func resolveDBSearchPath() string {
+	if explicit := normalizeSearchPath(os.Getenv("DB_SEARCH_PATH")); explicit != "" {
+		return explicit
+	}
+
+	if schema := DBSchemaName(); schema != "" {
+		return normalizeSearchPath(schema + ",public")
+	}
+
+	return "arena,public"
+}
 
 func envOrDefault(key, fallback string) string {
 	value := strings.TrimSpace(os.Getenv(key))
@@ -71,6 +138,8 @@ func inferSSLMode(host string) string {
 }
 
 func buildPostgresDSN() (string, string, error) {
+	searchPath := resolveDBSearchPath()
+
 	if databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL")); databaseURL != "" {
 		parsedURL, err := url.Parse(databaseURL)
 		if err != nil {
@@ -80,8 +149,11 @@ func buildPostgresDSN() (string, string, error) {
 		query := parsedURL.Query()
 		if query.Get("sslmode") == "" {
 			query.Set("sslmode", inferSSLMode(parsedURL.Hostname()))
-			parsedURL.RawQuery = query.Encode()
 		}
+		if query.Get("search_path") == "" && searchPath != "" {
+			query.Set("search_path", searchPath)
+		}
+		parsedURL.RawQuery = query.Encode()
 
 		return parsedURL.String(), "DATABASE_URL", nil
 	}
@@ -122,6 +194,9 @@ func buildPostgresDSN() (string, string, error) {
 
 	query := connectionURL.Query()
 	query.Set("sslmode", inferSSLMode(host))
+	if searchPath != "" {
+		query.Set("search_path", searchPath)
+	}
 	connectionURL.RawQuery = query.Encode()
 
 	return connectionURL.String(), "DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME", nil
@@ -143,7 +218,7 @@ func ConnectDB() {
 		log.Fatalf("banco de dados nao respondeu: %v", err)
 	}
 
-	log.Printf("conectado ao PostgreSQL com sucesso usando %s", source)
+	log.Printf("conectado ao PostgreSQL com sucesso usando %s (search_path=%s)", source, resolveDBSearchPath())
 }
 
 func EnsureEmailCodesTable() {
@@ -151,26 +226,21 @@ func EnsureEmailCodesTable() {
 		log.Fatal("database connection not initialized")
 	}
 
-	statements := []string{
-		`
-		CREATE TABLE IF NOT EXISTS email_codes (
-			id BIGSERIAL PRIMARY KEY,
-			email TEXT NOT NULL,
-			purpose TEXT NOT NULL,
-			code_hash TEXT NOT NULL,
-			payload BYTEA,
-			expires_at TIMESTAMPTZ NOT NULL,
-			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-			CONSTRAINT email_codes_email_purpose_key UNIQUE (email, purpose)
-		)
-		`,
-		`CREATE INDEX IF NOT EXISTS idx_email_codes_expires_at ON email_codes (expires_at)`,
+	emailCodesTable := QualifiedName("email_codes")
+	var exists bool
+	if err := DB.QueryRow(
+		`SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.tables
+			WHERE table_schema = $1 AND table_name = 'email_codes'
+		)`,
+		DBSchemaName(),
+	).Scan(&exists); err != nil {
+		log.Fatalf("failed to validate email_codes table: %v", err)
 	}
 
-	for _, statement := range statements {
-		if _, err := DB.Exec(statement); err != nil {
-			log.Fatalf("failed to ensure email_codes table: %v", err)
-		}
+	if !exists {
+		log.Fatalf("required table %s was not found", emailCodesTable)
 	}
 
 	log.Println("email_codes table is ready")

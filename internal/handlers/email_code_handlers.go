@@ -46,6 +46,14 @@ type signupPayload struct {
 	PasswordHash string `json:"password_hash"`
 }
 
+func emailCodesTableName() string {
+	return config.QualifiedName("email_codes")
+}
+
+func usuarioTableName() string {
+	return config.QualifiedName("usuario")
+}
+
 func StartSignupVerification(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -173,7 +181,7 @@ func ConfirmSignupCode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err = config.DB.Exec(
-		"INSERT INTO usuario (nome, email, senha) VALUES ($1, $2, $3)",
+		fmt.Sprintf("INSERT INTO %s (nome, email, senha) VALUES ($1, $2, $3)", usuarioTableName()),
 		payload.Username, req.Email, payload.PasswordHash,
 	)
 	if err != nil {
@@ -376,7 +384,7 @@ func ResetForgotPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := config.DB.Exec(
-		"UPDATE usuario SET senha = $1 WHERE email = $2",
+		fmt.Sprintf("UPDATE %s SET senha = $1 WHERE email = $2", usuarioTableName()),
 		passwordHash, req.Email,
 	)
 	if err != nil {
@@ -403,11 +411,11 @@ func ResetForgotPassword(w http.ResponseWriter, r *http.Request) {
 
 func getEmailCode(email, purpose string) (models.EmailCode, error) {
 	var record models.EmailCode
-	err := config.DB.QueryRow(`
+	err := config.DB.QueryRow(fmt.Sprintf(`
 		SELECT id, email, purpose, code_hash, payload, expires_at, created_at
-		FROM email_codes
+		FROM %s
 		WHERE email = $1 AND purpose = $2
-	`, email, purpose).Scan(
+	`, emailCodesTableName()), email, purpose).Scan(
 		&record.ID,
 		&record.Email,
 		&record.Purpose,
@@ -442,8 +450,8 @@ func validateEmailCode(email, purpose, code string) (models.EmailCode, error) {
 }
 
 func upsertEmailCode(email, purpose, code string, payload []byte) error {
-	_, err := config.DB.Exec(`
-		INSERT INTO email_codes (email, purpose, code_hash, payload, expires_at, created_at)
+	_, err := config.DB.Exec(fmt.Sprintf(`
+		INSERT INTO %s (email, purpose, code_hash, payload, expires_at, created_at)
 		VALUES ($1, $2, $3, $4, $5, NOW())
 		ON CONFLICT (email, purpose)
 		DO UPDATE SET
@@ -451,7 +459,7 @@ func upsertEmailCode(email, purpose, code string, payload []byte) error {
 			payload = EXCLUDED.payload,
 			expires_at = EXCLUDED.expires_at,
 			created_at = NOW()
-	`,
+	`, emailCodesTableName()),
 		email,
 		purpose,
 		hashVerificationCode(email, purpose, code),
@@ -463,18 +471,19 @@ func upsertEmailCode(email, purpose, code string, payload []byte) error {
 }
 
 func deleteEmailCode(email, purpose string) error {
-	_, err := config.DB.Exec(`
-		DELETE FROM email_codes
+	_, err := config.DB.Exec(fmt.Sprintf(`
+		DELETE FROM %s
 		WHERE email = $1 AND purpose = $2
-	`, email, purpose)
+	`, emailCodesTableName()), email, purpose)
 	return err
 }
 
 func userEmailExists(email string) (bool, error) {
 	var exists bool
-	err := config.DB.QueryRow(`
-		SELECT EXISTS(SELECT 1 FROM usuario WHERE email = $1)
-	`, email).Scan(&exists)
+	err := config.DB.QueryRow(
+		fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM %s WHERE email = $1)", usuarioTableName()),
+		email,
+	).Scan(&exists)
 
 	return exists, err
 }
