@@ -84,6 +84,14 @@ type agendamentoPagamentosResumoResponse struct {
 	TotalPago   float64                        `json:"total_pago"`
 }
 
+func formatAgendamentoDateTime(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+
+	return value.Format("2006-01-02T15:04:05")
+}
+
 func AgendarCampo(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 	if !ok {
@@ -610,7 +618,7 @@ func newAgendamentoResponse(agendamento models.Agendamento) agendamentoResponse 
 		CampoID:           agendamento.IDCampo,
 		IDArena:           agendamento.IDArena,
 		NomeSolicitante:   agendamento.NomeSolicitante,
-		Horario:           agendamento.Horario.Format(time.RFC3339),
+		Horario:           formatAgendamentoDateTime(agendamento.Horario),
 		Jogadores:         agendamento.Jogadores,
 		Pagamento:         agendamento.Pagamento,
 		Pago:              agendamento.Pago,
@@ -628,10 +636,10 @@ func newAgendamentoResponse(agendamento models.Agendamento) agendamentoResponse 
 	}
 
 	if !agendamento.CriadoEm.IsZero() {
-		response.CriadoEm = agendamento.CriadoEm.Format(time.RFC3339)
+		response.CriadoEm = formatAgendamentoDateTime(agendamento.CriadoEm)
 	}
 	if agendamento.FimCronometro != nil && !agendamento.FimCronometro.IsZero() {
-		response.FimCronometro = agendamento.FimCronometro.Format(time.RFC3339)
+		response.FimCronometro = formatAgendamentoDateTime(*agendamento.FimCronometro)
 	}
 
 	return response
@@ -644,7 +652,7 @@ func newAgendamentoPagamentoResponse(pagamento models.AgendamentoPagamento) agen
 		IDUsuario:        pagamento.IDUsuario,
 		ValorPago:        pagamento.ValorPago,
 		FormaPagamento:   pagamento.FormaPagamento,
-		DataPagamento:    pagamento.DataPagamento.Format(time.RFC3339),
+		DataPagamento:    formatAgendamentoDateTime(pagamento.DataPagamento),
 		NomeUsuario:      pagamento.NomeUsuario,
 		SobrenomeUsuario: pagamento.SobrenomeUsuario,
 		EmailUsuario:     pagamento.EmailUsuario,
