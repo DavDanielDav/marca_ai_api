@@ -106,7 +106,7 @@ func main() {
 	r.HandleFunc("/forgot-password/send-code", handlers.SendForgotPasswordCode).Methods("POST")
 	r.HandleFunc("/forgot-password/verify-code", handlers.VerifyForgotPasswordCode).Methods("POST")
 	r.HandleFunc("/forgot-password/reset-password", handlers.ResetForgotPassword).Methods("POST")
-	r.HandleFunc("/ajogador", handlers.GetArenasJogador).Methods("GET")
+	r.HandleFunc("/arenas", handlers.GetArenasJogador).Methods("GET")
 	r.HandleFunc("/horarios-disponiveis", handlers.GetHorariosDisponiveisCampo).Methods("GET")
 	r.HandleFunc("/integracao/agendamentos", handlers.CriarPedidoAgendamentoJogador).Methods("POST")
 
@@ -119,7 +119,7 @@ func main() {
 	authRouter.HandleFunc("/cadastrar-arena", handlers.CadastrodeArena).Methods("POST")
 	authRouter.HandleFunc("/excluir-arena", handlers.DeleteArena).Methods("DELETE")
 	authRouter.HandleFunc("/editar-arena", handlers.UpdateArena).Methods("PUT")
-	authRouter.HandleFunc("/arenas", handlers.GetArenas).Methods("GET")
+	authRouter.HandleFunc("/listararenas", handlers.GetArenas).Methods("GET")
 	authRouter.HandleFunc("/cadastrar-campo", handlers.CadastrodeCampo).Methods("POST")
 	authRouter.HandleFunc("/listar-campos", handlers.GetCampos).Methods("GET")
 	authRouter.HandleFunc("/editar-campo", handlers.UpdateCampo).Methods("PUT")
