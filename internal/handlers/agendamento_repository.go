@@ -27,13 +27,14 @@ type campoAgendamentoSnapshot struct {
 }
 
 type agendamentoUpdateInput struct {
-	IDCampo       int
-	Horario       time.Time
-	Jogadores     int
-	Pagamento     string
-	Pago          bool
-	ValorTotal    float64
-	ValorRestante float64
+	IDCampo         int
+	Horario         time.Time
+	Jogadores       int
+	Pagamento       string
+	Pago            bool
+	NomeSolicitante string
+	ValorTotal      float64
+	ValorRestante   float64
 }
 
 type agendamentoFinancialUpdate struct {
@@ -145,6 +146,7 @@ func (agendamentoRepository) create(ctx context.Context, input models.CreateAgen
 			jogadores,
 			pagamento,
 			pago,
+			nome_solicitante,
 			status,
 			status_de_pagamento,
 			origem_agendamento,
@@ -154,7 +156,7 @@ func (agendamentoRepository) create(ctx context.Context, input models.CreateAgen
 			time2,
 			modo_de_jogo
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NULLIF($12, ''), NULLIF($13, ''), NULLIF($14, ''))
+		VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, ''), $8, $9, $10, $11, $12, NULLIF($13, ''), NULLIF($14, ''), NULLIF($15, ''))
 		RETURNING id_agendamento, COALESCE(criado_em, NOW())
 	`, agendamentosTableName())
 
@@ -168,6 +170,7 @@ func (agendamentoRepository) create(ctx context.Context, input models.CreateAgen
 		input.Jogadores,
 		input.Pagamento,
 		input.Pago,
+		input.NomeSolicitante,
 		string(status),
 		input.Pago,
 		string(input.OrigemAgendamento),
@@ -189,6 +192,7 @@ func (agendamentoRepository) create(ctx context.Context, input models.CreateAgen
 	agendamento.Jogadores = input.Jogadores
 	agendamento.Pagamento = input.Pagamento
 	agendamento.Pago = input.Pago
+	agendamento.NomeSolicitante = input.NomeSolicitante
 	agendamento.StatusDePagamento = input.Pago
 	agendamento.Status = status
 	agendamento.OrigemAgendamento = input.OrigemAgendamento
@@ -279,9 +283,10 @@ func (agendamentoRepository) update(ctx context.Context, agendamentoID int, inpu
 			pagamento = $4,
 			pago = $5,
 			status_de_pagamento = $6,
-			valor_total = $7,
-			valor_restante = $8
-		WHERE id_agendamento = $9
+			nome_solicitante = NULLIF($7, ''),
+			valor_total = $8,
+			valor_restante = $9
+		WHERE id_agendamento = $10
 	`, agendamentosTableName()),
 		input.IDCampo,
 		input.Horario,
@@ -289,6 +294,7 @@ func (agendamentoRepository) update(ctx context.Context, agendamentoID int, inpu
 		input.Pagamento,
 		input.Pago,
 		input.Pago,
+		input.NomeSolicitante,
 		input.ValorTotal,
 		input.ValorRestante,
 		agendamentoID,
@@ -459,6 +465,7 @@ func agendamentoBaseSelectQuery() string {
 			a.id_usuario,
 			a.id_campo,
 			c.id_arena,
+			COALESCE(a.nome_solicitante, ''),
 			a.horario,
 			a.jogadores,
 			a.pagamento,
@@ -511,6 +518,7 @@ func scanAgendamento(scanner agendamentoScanner) (models.Agendamento, error) {
 		&idUsuario,
 		&agendamento.IDCampo,
 		&agendamento.IDArena,
+		&agendamento.NomeSolicitante,
 		&agendamento.Horario,
 		&agendamento.Jogadores,
 		&pagamento,

@@ -106,13 +106,14 @@ func (service agendamentoService) Edit(ctx context.Context, ownerUserID int, age
 	)
 
 	err = service.repository.update(ctx, agendamentoID, agendamentoUpdateInput{
-		IDCampo:       input.IDCampo,
-		Horario:       input.Horario,
-		Jogadores:     input.Jogadores,
-		Pagamento:     input.Pagamento,
-		Pago:          pago,
-		ValorTotal:    valorTotal,
-		ValorRestante: valorRestante,
+		IDCampo:         input.IDCampo,
+		Horario:         input.Horario,
+		Jogadores:       input.Jogadores,
+		Pagamento:       input.Pagamento,
+		Pago:            pago,
+		NomeSolicitante: input.NomeSolicitante,
+		ValorTotal:      valorTotal,
+		ValorRestante:   valorRestante,
 	})
 	if err != nil {
 		return models.Agendamento{}, err
@@ -124,6 +125,7 @@ func (service agendamentoService) Edit(ctx context.Context, ownerUserID int, age
 	agendamentoAtual.Jogadores = input.Jogadores
 	agendamentoAtual.Pagamento = input.Pagamento
 	agendamentoAtual.Pago = pago
+	agendamentoAtual.NomeSolicitante = input.NomeSolicitante
 	agendamentoAtual.StatusDePagamento = statusDePagamento
 	agendamentoAtual.NomeCampo = campo.NomeCampo
 	agendamentoAtual.NomeArena = campo.NomeArena

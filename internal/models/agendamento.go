@@ -29,6 +29,7 @@ type Agendamento struct {
 	IDUsuario          int               `json:"id_usuario,omitempty"`
 	IDCampo            int               `json:"id_campo"`
 	IDArena            int               `json:"id_arena,omitempty"`
+	NomeSolicitante    string            `json:"nome_solicitante,omitempty"`
 	Horario            time.Time         `json:"horario"`
 	Jogadores          int               `json:"jogadores"`
 	Pagamento          string            `json:"pagamento"`
@@ -55,6 +56,7 @@ type CreateAgendamentoInput struct {
 	Jogadores         int
 	Pagamento         string
 	Pago              bool
+	NomeSolicitante   string
 	OrigemAgendamento AgendamentoOrigem
 	IDUsuario         *int
 	Time1             string

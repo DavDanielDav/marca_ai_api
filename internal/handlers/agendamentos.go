@@ -22,6 +22,7 @@ type agendamentoCreateRequest struct {
 	Jogadores         int    `json:"jogadores"`
 	Pagamento         string `json:"pagamento"`
 	Pago              bool   `json:"pago"`
+	NomeSolicitante   string `json:"nome_solicitante"`
 	OrigemAgendamento string `json:"origem_agendamento"`
 	Origem            string `json:"origem"`
 	Time1             string `json:"time1"`
@@ -45,6 +46,7 @@ type agendamentoResponse struct {
 	IDCampo           int     `json:"id_campo"`
 	CampoID           int     `json:"campo_id"`
 	IDArena           int     `json:"id_arena,omitempty"`
+	NomeSolicitante   string  `json:"nome_solicitante,omitempty"`
 	Horario           string  `json:"horario"`
 	Jogadores         int     `json:"jogadores"`
 	Pagamento         string  `json:"pagamento"`
@@ -499,6 +501,7 @@ func parseAgendamentoCreateRequest(r *http.Request) (models.CreateAgendamentoInp
 		Jogadores:         request.Jogadores,
 		Pagamento:         strings.TrimSpace(request.Pagamento),
 		Pago:              request.Pago,
+		NomeSolicitante:   strings.TrimSpace(request.NomeSolicitante),
 		OrigemAgendamento: origem,
 		Time1:             strings.TrimSpace(request.Time1),
 		Time2:             strings.TrimSpace(request.Time2),
@@ -606,6 +609,7 @@ func newAgendamentoResponse(agendamento models.Agendamento) agendamentoResponse 
 		IDCampo:           agendamento.IDCampo,
 		CampoID:           agendamento.IDCampo,
 		IDArena:           agendamento.IDArena,
+		NomeSolicitante:   agendamento.NomeSolicitante,
 		Horario:           agendamento.Horario.Format(time.RFC3339),
 		Jogadores:         agendamento.Jogadores,
 		Pagamento:         agendamento.Pagamento,
