@@ -106,11 +106,11 @@ func CadastrodeCampo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var pertence bool
-	err = config.DB.QueryRow(`
+	err = config.DB.QueryRow(fmt.Sprintf(`
 		SELECT EXISTS (
-			SELECT 1 FROM arenas WHERE id = $1 AND id_usuario = $2
+			SELECT 1 FROM %s WHERE id = $1 AND id_usuario = $2
 		)
-	`, idArena, userID).Scan(&pertence)
+	`, arenasTableName()), idArena, userID).Scan(&pertence)
 	if err != nil {
 		http.Error(w, "Erro ao verificar arena", http.StatusInternalServerError)
 		return
@@ -219,7 +219,7 @@ func GetCampos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rowsArenas, err := config.DB.Query(`SELECT id FROM arenas WHERE id_usuario = $1`, userID)
+	rowsArenas, err := config.DB.Query(fmt.Sprintf(`SELECT id FROM %s WHERE id_usuario = $1`, arenasTableName()), userID)
 	if err != nil {
 		http.Error(w, "Erro ao buscar arenas do usuario", http.StatusInternalServerError)
 		log.Printf("Erro ao buscar arenas: %v", err)
@@ -244,7 +244,7 @@ func GetCampos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `
+	query := fmt.Sprintf(`
 		SELECT
 			c.id_campo,
 			c.nome_campo,
@@ -252,15 +252,15 @@ func GetCampos(w http.ResponseWriter, r *http.Request) {
 			c.modalidade,
 			c.tipo_campo,
 			c.imagem,
-			` + optionalCampoSelectExpression("c", "valor_hora", optionalColumns.ValorHora) + `,
-			` + optionalCampoSelectExpression("c", "ativo", optionalColumns.Ativo) + `,
-			` + optionalCampoSelectExpression("c", "horarios_disponiveis", optionalColumns.HorariosDisponiveis) + `,
+			`+optionalCampoSelectExpression("c", "valor_hora", optionalColumns.ValorHora)+`,
+			`+optionalCampoSelectExpression("c", "ativo", optionalColumns.Ativo)+`,
+			`+optionalCampoSelectExpression("c", "horarios_disponiveis", optionalColumns.HorariosDisponiveis)+`,
 			c.id_arena,
 			a.nome AS nome_arena
-		FROM campo c
-		JOIN arenas a ON c.id_arena = a.id
+		FROM %s c
+		JOIN %s a ON c.id_arena = a.id
 		WHERE a.id_usuario = $1;
-	`
+	`, campoTableName(), arenasTableName())
 
 	rowsCampos, err := config.DB.Query(query, userID)
 	if err != nil {
@@ -326,14 +326,14 @@ func UpdateCampo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var pertence bool
-	err = config.DB.QueryRow(`
+	err = config.DB.QueryRow(fmt.Sprintf(`
 		SELECT EXISTS (
 			SELECT 1
-			FROM campo c
-			JOIN arenas a ON c.id_arena = a.id
+			FROM %s c
+			JOIN %s a ON c.id_arena = a.id
 			WHERE c.id_campo = $1 AND a.id_usuario = $2
 		)
-	`, idCampo, userID).Scan(&pertence)
+	`, campoTableName(), arenasTableName()), idCampo, userID).Scan(&pertence)
 	if err != nil {
 		log.Printf("Erro ao verificar propriedade do campo: %v", err)
 		http.Error(w, "Erro ao verificar propriedade do campo", http.StatusInternalServerError)
@@ -347,13 +347,13 @@ func UpdateCampo(w http.ResponseWriter, r *http.Request) {
 
 	if payload.IdArena > 0 {
 		var arenaPertence bool
-		err = config.DB.QueryRow(`
+		err = config.DB.QueryRow(fmt.Sprintf(`
 			SELECT EXISTS (
 				SELECT 1
-				FROM arenas
+				FROM %s
 				WHERE id = $1 AND id_usuario = $2
 			)
-		`, payload.IdArena, userID).Scan(&arenaPertence)
+		`, arenasTableName()), payload.IdArena, userID).Scan(&arenaPertence)
 		if err != nil {
 			log.Printf("Erro ao verificar arena de destino do campo: %v", err)
 			http.Error(w, "Erro ao verificar arena do campo", http.StatusInternalServerError)
@@ -373,8 +373,8 @@ func UpdateCampo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = config.DB.Exec(`
-		UPDATE campo
+	_, err = config.DB.Exec(fmt.Sprintf(`
+		UPDATE %s
 		SET
 			nome_campo = COALESCE(NULLIF($1, ''), nome_campo),
 			max_jogadores = CASE WHEN $2 > 0 THEN $2 ELSE max_jogadores END,
@@ -383,7 +383,7 @@ func UpdateCampo(w http.ResponseWriter, r *http.Request) {
 			imagem = COALESCE(NULLIF($5, ''), imagem),
 			id_arena = CASE WHEN $6 > 0 THEN $6 ELSE id_arena END
 		WHERE id_campo = $7
-	`, payload.Nome, payload.MaxJogadores, payload.Modalidade, payload.TipoCampo, payload.Imagem, payload.IdArena, idCampo)
+	`, campoTableName()), payload.Nome, payload.MaxJogadores, payload.Modalidade, payload.TipoCampo, payload.Imagem, payload.IdArena, idCampo)
 	if err != nil {
 		log.Printf("Erro ao atualizar campo: %v", err)
 		http.Error(w, "Erro ao atualizar campo", http.StatusInternalServerError)
@@ -476,7 +476,7 @@ func AtualizarManutencaoCampo(w http.ResponseWriter, r *http.Request) {
 		desiredStatus = *payload.Ativo
 	}
 
-	_, err = config.DB.Exec(`UPDATE campo SET ativo = $1 WHERE id_campo = $2`, desiredStatus, idCampo)
+	_, err = config.DB.Exec(fmt.Sprintf(`UPDATE %s SET ativo = $1 WHERE id_campo = $2`, campoTableName()), desiredStatus, idCampo)
 	if err != nil {
 		http.Error(w, "Erro ao atualizar manutencao do campo", http.StatusInternalServerError)
 		log.Printf("Erro ao atualizar coluna ativo do campo %d: %v", idCampo, err)
@@ -721,14 +721,14 @@ var errCampoOwnershipForbidden = errors.New("campo nao pertence ao usuario")
 
 func ensureCampoBelongsToUser(idCampo, userID int) error {
 	var pertence bool
-	err := config.DB.QueryRow(`
+	err := config.DB.QueryRow(fmt.Sprintf(`
 		SELECT EXISTS (
 			SELECT 1
-			FROM campo c
-			JOIN arenas a ON c.id_arena = a.id
+			FROM %s c
+			JOIN %s a ON c.id_arena = a.id
 			WHERE c.id_campo = $1 AND a.id_usuario = $2
 		)
-	`, idCampo, userID).Scan(&pertence)
+	`, campoTableName(), arenasTableName()), idCampo, userID).Scan(&pertence)
 	if err != nil {
 		return err
 	}
@@ -741,7 +741,7 @@ func ensureCampoBelongsToUser(idCampo, userID int) error {
 
 func getCampoAtivoStatus(idCampo int) (bool, error) {
 	var ativo bool
-	err := config.DB.QueryRow(`SELECT ativo FROM campo WHERE id_campo = $1`, idCampo).Scan(&ativo)
+	err := config.DB.QueryRow(fmt.Sprintf(`SELECT ativo FROM %s WHERE id_campo = $1`, campoTableName()), idCampo).Scan(&ativo)
 	if err != nil {
 		return false, err
 	}
@@ -808,7 +808,7 @@ func updateCampoOptionalFields(idCampo int, payload campoUpdatePayload, columns 
 		return nil
 	}
 
-	query := fmt.Sprintf("UPDATE campo SET %s WHERE id_campo = $1", strings.Join(assignments, ", "))
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE id_campo = $1", campoTableName(), strings.Join(assignments, ", "))
 	_, err := config.DB.Exec(query, args...)
 	return err
 }
@@ -834,14 +834,14 @@ func DeleteCampo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var pertence bool
-	err = config.DB.QueryRow(`
+	err = config.DB.QueryRow(fmt.Sprintf(`
 		SELECT EXISTS (
 			SELECT 1
-			FROM campo c
-			JOIN arenas a ON c.id_arena = a.id
+			FROM %s c
+			JOIN %s a ON c.id_arena = a.id
 			WHERE c.id_campo = $1 AND a.id_usuario = $2
 		)
-	`, idCampo, userID).Scan(&pertence)
+	`, campoTableName(), arenasTableName()), idCampo, userID).Scan(&pertence)
 	if err != nil {
 		http.Error(w, "Erro ao verificar propriedade do campo", http.StatusInternalServerError)
 		return
@@ -852,12 +852,12 @@ func DeleteCampo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var countNaoPermitidos int
-	err = config.DB.QueryRow(`
+	err = config.DB.QueryRow(fmt.Sprintf(`
 		SELECT COUNT(*)
-		FROM agendamentos
+		FROM %s
 		WHERE id_campo = $1
 		  AND status NOT IN ('concluido', 'cancelado')
-	`, idCampo).Scan(&countNaoPermitidos)
+	`, agendamentosTableName()), idCampo).Scan(&countNaoPermitidos)
 	if err != nil {
 		http.Error(w, "Erro ao verificar agendamentos do campo", http.StatusInternalServerError)
 		return
@@ -867,17 +867,17 @@ func DeleteCampo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = config.DB.Exec(`
-		DELETE FROM agendamentos
+	_, err = config.DB.Exec(fmt.Sprintf(`
+		DELETE FROM %s
 		WHERE id_campo = $1
 		  AND status IN ('cancelado', 'concluido')
-	`, idCampo)
+	`, agendamentosTableName()), idCampo)
 	if err != nil {
 		http.Error(w, "Erro ao excluir agendamentos cancelados", http.StatusInternalServerError)
 		return
 	}
 
-	_, err = config.DB.Exec("DELETE FROM campo WHERE id_campo = $1", idCampo)
+	_, err = config.DB.Exec(fmt.Sprintf("DELETE FROM %s WHERE id_campo = $1", campoTableName()), idCampo)
 	if err != nil {
 		http.Error(w, "Erro ao deletar campo", http.StatusInternalServerError)
 		log.Println("ERRO AO DELETAR:", err)

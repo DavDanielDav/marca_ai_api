@@ -18,10 +18,10 @@ func loadCampoOptionalColumns(ctx context.Context) (campoOptionalColumns, error)
 	rows, err := config.DB.QueryContext(ctx, `
 		SELECT column_name
 		FROM information_schema.columns
-		WHERE table_schema IN ('public', 'arena')
+		WHERE table_schema = $1
 		  AND table_name = 'campo'
 		  AND column_name IN ('valor_hora', 'ativo', 'horarios_disponiveis')
-	`)
+	`, config.DBSchemaName())
 	if err != nil {
 		return campoOptionalColumns{}, err
 	}
@@ -111,7 +111,8 @@ func buildCampoInsertQuery(columns campoOptionalColumns) string {
 	}
 
 	return fmt.Sprintf(
-		"INSERT INTO campo (%s) VALUES (%s)",
+		"INSERT INTO %s (%s) VALUES (%s)",
+		campoTableName(),
 		strings.Join(columnNames, ", "),
 		strings.Join(placeholders, ", "),
 	)

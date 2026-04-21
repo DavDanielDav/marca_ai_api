@@ -57,26 +57,26 @@ func GetDashboard(w http.ResponseWriter, r *http.Request) {
 	metricasQuery := `
 		WITH campos_usuario AS (
 			SELECT c.id_campo
-			FROM campo c
-			JOIN arenas a ON a.id = c.id_arena
+			FROM ` + campoTableName() + ` c
+			JOIN ` + arenasTableName() + ` a ON a.id = c.id_arena
 			WHERE a.id_usuario = $1
 		)
 		SELECT
 			(SELECT COUNT(*) FROM campos_usuario) AS campos_cadastrados,
 			(SELECT COUNT(*)
-			 FROM agendamentos ag
+			 FROM ` + agendamentosTableName() + ` ag
 			 JOIN campos_usuario cu ON cu.id_campo = ag.id_campo
 			 WHERE ag.status = 'agendado') AS campos_agendados,
 			(SELECT COUNT(*)
-			 FROM agendamentos ag
+			 FROM ` + agendamentosTableName() + ` ag
 			 JOIN campos_usuario cu ON cu.id_campo = ag.id_campo
 			 WHERE ag.status = 'cancelado') AS cancelados,
 			(SELECT COUNT(*)
-			 FROM agendamentos ag
+			 FROM ` + agendamentosTableName() + ` ag
 			 JOIN campos_usuario cu ON cu.id_campo = ag.id_campo
 			 WHERE ag.status = 'concluido') AS concluidos,
 			(SELECT COUNT(DISTINCT ag.id_campo)
-			 FROM agendamentos ag
+			 FROM ` + agendamentosTableName() + ` ag
 			 JOIN campos_usuario cu ON cu.id_campo = ag.id_campo
 			 WHERE ag.status <> 'cancelado'
 			   AND DATE(ag.horario AT TIME ZONE 'America/Sao_Paulo') = DATE(NOW() AT TIME ZONE 'America/Sao_Paulo')
@@ -107,9 +107,9 @@ func GetDashboard(w http.ResponseWriter, r *http.Request) {
 			c.nome_campo,
 			TO_CHAR(ag.horario AT TIME ZONE 'America/Sao_Paulo', 'HH24:MI') AS horario,
 			c.modalidade
-		FROM agendamentos ag
-		JOIN campo c ON c.id_campo = ag.id_campo
-		JOIN arenas a ON a.id = c.id_arena
+		FROM `+agendamentosTableName()+` ag
+		JOIN `+campoTableName()+` c ON c.id_campo = ag.id_campo
+		JOIN `+arenasTableName()+` a ON a.id = c.id_arena
 		WHERE a.id_usuario = $1
 		  AND ag.status = 'agendado'
 		  AND ag.horario >= NOW()
@@ -144,9 +144,9 @@ func GetDashboard(w http.ResponseWriter, r *http.Request) {
 		SELECT
 			c.nome_campo,
 			COUNT(*) AS reservas
-		FROM agendamentos ag
-		JOIN campo c ON c.id_campo = ag.id_campo
-		JOIN arenas a ON a.id = c.id_arena
+		FROM `+agendamentosTableName()+` ag
+		JOIN `+campoTableName()+` c ON c.id_campo = ag.id_campo
+		JOIN `+arenasTableName()+` a ON a.id = c.id_arena
 		WHERE a.id_usuario = $1
 		  AND ag.status <> 'cancelado'
 		GROUP BY c.id_campo, c.nome_campo

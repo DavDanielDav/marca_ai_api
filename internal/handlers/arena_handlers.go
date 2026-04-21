@@ -170,12 +170,13 @@ func GetArenas(w http.ResponseWriter, r *http.Request) {
 			%s,
 			%s,
 			%s
-		FROM arenas
+		FROM %s
 		WHERE id_usuario = $1
 	`,
 		optionalArenaSelectExpression("", "observacoes", optionalColumns.Observacoes),
 		optionalArenaSelectExpression("", "esportes_oferecidos", optionalColumns.EsportesOferecidos),
 		optionalArenaSelectExpression("", "informacoes_arena", optionalColumns.InformacoesArena),
+		arenasTableName(),
 	)
 
 	rows, err := config.DB.Query(query, userID)
@@ -228,7 +229,7 @@ func DeleteArena(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := config.DB.Exec("DELETE FROM arenas WHERE id_usuario=$1", userID)
+	_, err := config.DB.Exec(fmt.Sprintf("DELETE FROM %s WHERE id_usuario=$1", arenasTableName()), userID)
 	if err != nil {
 		log.Printf("Erro ao deletar arena do banco: %v", err)
 		http.Error(w, "Erro ao deletar arena do banco", http.StatusInternalServerError)

@@ -46,14 +46,6 @@ type signupPayload struct {
 	PasswordHash string `json:"password_hash"`
 }
 
-func emailCodesTableName() string {
-	return config.QualifiedName("email_codes")
-}
-
-func usuarioTableName() string {
-	return config.QualifiedName("usuario")
-}
-
 func StartSignupVerification(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

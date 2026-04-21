@@ -46,16 +46,18 @@ func (agendamentoRepository) loadCampoSnapshot(ctx context.Context, campoID int)
 		return campoAgendamentoSnapshot{}, err
 	}
 
+	campoTable := campoTableName()
+	arenasTable := arenasTableName()
 	arenaMaintenanceExpr := "CAST(FALSE AS BOOLEAN) AS arena_em_manutencao"
 	if optionalColumns.Ativo {
-		arenaMaintenanceExpr = `
+		arenaMaintenanceExpr = fmt.Sprintf(`
 			NOT EXISTS (
 				SELECT 1
-				FROM campo c2
+				FROM %s c2
 				WHERE c2.id_arena = c.id_arena
 				  AND COALESCE(c2.ativo, TRUE)
 			) AS arena_em_manutencao
-		`
+		`, campoTable)
 	}
 
 	query := fmt.Sprintf(`
@@ -69,13 +71,15 @@ func (agendamentoRepository) loadCampoSnapshot(ctx context.Context, campoID int)
 			c.max_jogadores,
 			%s,
 			%s
-		FROM campo c
-		JOIN arenas a ON a.id = c.id_arena
+		FROM %s c
+		JOIN %s a ON a.id = c.id_arena
 		WHERE c.id_campo = $1
 	`,
 		optionalCampoSelectExpression("c", "valor_hora", optionalColumns.ValorHora),
 		optionalCampoSelectExpression("c", "ativo", optionalColumns.Ativo),
 		arenaMaintenanceExpr,
+		campoTable,
+		arenasTable,
 	)
 
 	var snapshot campoAgendamentoSnapshot
@@ -103,13 +107,13 @@ func (agendamentoRepository) loadCampoSnapshot(ctx context.Context, campoID int)
 }
 
 func (agendamentoRepository) hasScheduleConflict(ctx context.Context, campoID int, horario time.Time, excludeID *int) (bool, error) {
-	query := `
+	query := fmt.Sprintf(`
 		SELECT COUNT(*)
-		FROM agendamentos
+		FROM %s
 		WHERE id_campo = $1
 		  AND horario = $2
 		  AND status != $3
-	`
+	`, agendamentosTableName())
 
 	args := []any{campoID, horario, string(models.AgendamentoStatusCancelado)}
 	if excludeID != nil {
@@ -126,8 +130,8 @@ func (agendamentoRepository) hasScheduleConflict(ctx context.Context, campoID in
 }
 
 func (agendamentoRepository) create(ctx context.Context, input models.CreateAgendamentoInput, status models.AgendamentoStatus, valorTotal float64, valorRestante float64) (models.Agendamento, error) {
-	query := `
-		INSERT INTO agendamentos (
+	query := fmt.Sprintf(`
+		INSERT INTO %s (
 			id_usuario,
 			id_campo,
 			horario,
@@ -141,7 +145,7 @@ func (agendamentoRepository) create(ctx context.Context, input models.CreateAgen
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id_agendamento, COALESCE(criado_em, NOW())
-	`
+	`, agendamentosTableName())
 
 	var agendamento models.Agendamento
 	err := config.DB.QueryRowContext(
@@ -237,7 +241,7 @@ func (repository agendamentoRepository) getByIDForOwner(ctx context.Context, age
 func (agendamentoRepository) updateStatus(ctx context.Context, agendamentoID int, status models.AgendamentoStatus) error {
 	_, err := config.DB.ExecContext(
 		ctx,
-		`UPDATE agendamentos SET status = $1 WHERE id_agendamento = $2`,
+		fmt.Sprintf(`UPDATE %s SET status = $1 WHERE id_agendamento = $2`, agendamentosTableName()),
 		string(status),
 		agendamentoID,
 	)
@@ -245,8 +249,8 @@ func (agendamentoRepository) updateStatus(ctx context.Context, agendamentoID int
 }
 
 func (agendamentoRepository) update(ctx context.Context, agendamentoID int, input agendamentoUpdateInput) error {
-	_, err := config.DB.ExecContext(ctx, `
-		UPDATE agendamentos
+	_, err := config.DB.ExecContext(ctx, fmt.Sprintf(`
+		UPDATE %s
 		SET
 			id_campo = $1,
 			horario = $2,
@@ -256,7 +260,7 @@ func (agendamentoRepository) update(ctx context.Context, agendamentoID int, inpu
 			valor_total = $6,
 			valor_restante = $7
 		WHERE id_agendamento = $8
-	`,
+	`, agendamentosTableName()),
 		input.IDCampo,
 		input.Horario,
 		input.Jogadores,
@@ -273,7 +277,7 @@ func (agendamentoRepository) sumPayments(ctx context.Context, agendamentoID int)
 	var total sql.NullFloat64
 	err := config.DB.QueryRowContext(
 		ctx,
-		`SELECT COALESCE(SUM(valor_pago), 0) FROM pagamentos_por_agendamento WHERE id_agendamento = $1`,
+		fmt.Sprintf(`SELECT COALESCE(SUM(valor_pago), 0) FROM %s WHERE id_agendamento = $1`, pagamentosPorAgendamentoTableName()),
 		agendamentoID,
 	).Scan(&total)
 	if err != nil {
@@ -288,7 +292,7 @@ func (agendamentoRepository) sumPayments(ctx context.Context, agendamentoID int)
 }
 
 func agendamentoBaseSelectQuery() string {
-	return `
+	return fmt.Sprintf(`
 		SELECT
 			a.id_agendamento,
 			a.id_usuario,
@@ -305,10 +309,10 @@ func agendamentoBaseSelectQuery() string {
 			COALESCE(a.origem_agendamento, 'manual') AS origem_agendamento,
 			COALESCE(a.valor_total, 0),
 			COALESCE(a.valor_restante, 0)
-		FROM agendamentos a
-		JOIN campo c ON a.id_campo = c.id_campo
-		JOIN arenas ar ON c.id_arena = ar.id
-	`
+		FROM %s a
+		JOIN %s c ON a.id_campo = c.id_campo
+		JOIN %s ar ON c.id_arena = ar.id
+	`, agendamentosTableName(), campoTableName(), arenasTableName())
 }
 
 type agendamentoScanner interface {

@@ -1,0 +1,11 @@
+# test log
+getenv DB_SCHEMA
+getenv DB_SCHEMA
+getenv DB_SCHEMA
+getenv jwtKey
+getenv jwtKey
+getenv jwtKey
+getenv jwtKey
+getenv jwtKey
+getenv jwtKey
+getenv jwtKey

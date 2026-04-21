@@ -18,10 +18,10 @@ func loadArenaOptionalColumns(ctx context.Context) (arenaOptionalColumns, error)
 	rows, err := config.DB.QueryContext(ctx, `
 		SELECT column_name
 		FROM information_schema.columns
-		WHERE table_schema IN ('public', 'arena')
+		WHERE table_schema = $1
 		  AND table_name = 'arenas'
 		  AND column_name IN ('observacoes', 'esportes_oferecidos', 'informacoes_arena')
-	`)
+	`, config.DBSchemaName())
 	if err != nil {
 		return arenaOptionalColumns{}, err
 	}
@@ -92,7 +92,8 @@ func buildArenaInsertQuery(columns arenaOptionalColumns) string {
 	}
 
 	return fmt.Sprintf(
-		"INSERT INTO arenas (%s) VALUES (%s)",
+		"INSERT INTO %s (%s) VALUES (%s)",
+		arenasTableName(),
 		strings.Join(columnNames, ", "),
 		strings.Join(placeholders, ", "),
 	)
@@ -148,7 +149,8 @@ func buildArenaUpdateQuery(columns arenaOptionalColumns) string {
 	}
 
 	return fmt.Sprintf(
-		"UPDATE arenas SET %s WHERE id_usuario = $%d",
+		"UPDATE %s SET %s WHERE id_usuario = $%d",
+		arenasTableName(),
 		strings.Join(assignments, ", "),
 		nextPlaceholder,
 	)

@@ -53,8 +53,8 @@ func GetArenasJogador(w http.ResponseWriter, r *http.Request) {
 			%s,
 			%s,
 			%s
-		FROM arenas a
-		LEFT JOIN campo c ON c.id_arena = a.id
+		FROM %s a
+		LEFT JOIN %s c ON c.id_arena = a.id
 		ORDER BY a.id;
 	`,
 		optionalArenaSelectExpression("a", "observacoes", optionalColumns.Observacoes),
@@ -63,6 +63,8 @@ func GetArenasJogador(w http.ResponseWriter, r *http.Request) {
 		optionalCampoSelectExpression("c", "valor_hora", campoOptionalColumns.ValorHora),
 		optionalCampoSelectExpression("c", "ativo", campoOptionalColumns.Ativo),
 		optionalCampoSelectExpression("c", "horarios_disponiveis", campoOptionalColumns.HorariosDisponiveis),
+		arenasTableName(),
+		campoTableName(),
 	)
 
 	rows, err := config.DB.Query(query)

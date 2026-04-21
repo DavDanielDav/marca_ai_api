@@ -137,16 +137,18 @@ func loadCampoDisponibilidadeInfo(campoID int) (campoDisponibilidadeInfo, error)
 		return campoDisponibilidadeInfo{}, err
 	}
 
+	campoTable := campoTableName()
+	arenasTable := arenasTableName()
 	arenaMaintenanceExpr := "CAST(FALSE AS BOOLEAN) AS arena_em_manutencao"
 	if optionalColumns.Ativo {
-		arenaMaintenanceExpr = `
+		arenaMaintenanceExpr = fmt.Sprintf(`
 			NOT EXISTS (
 				SELECT 1
-				FROM campo c2
+				FROM %s c2
 				WHERE c2.id_arena = c.id_arena
 				  AND COALESCE(c2.ativo, TRUE)
 			) AS arena_em_manutencao
-		`
+		`, campoTable)
 	}
 
 	query := fmt.Sprintf(`
@@ -159,14 +161,16 @@ func loadCampoDisponibilidadeInfo(campoID int) (campoDisponibilidadeInfo, error)
 			%s,
 			%s,
 			%s
-		FROM campo c
-		JOIN arenas a ON a.id = c.id_arena
+		FROM %s c
+		JOIN %s a ON a.id = c.id_arena
 		WHERE c.id_campo = $1
 	`,
 		optionalCampoSelectExpression("c", "valor_hora", optionalColumns.ValorHora),
 		optionalCampoSelectExpression("c", "ativo", optionalColumns.Ativo),
 		optionalCampoSelectExpression("c", "horarios_disponiveis", optionalColumns.HorariosDisponiveis),
 		arenaMaintenanceExpr,
+		campoTable,
+		arenasTable,
 	)
 
 	var info campoDisponibilidadeInfo
@@ -194,15 +198,15 @@ func loadOccupiedSlotsByCampo(campoID int, requestedDate time.Time, location *ti
 	startOfDay := time.Date(requestedDate.Year(), requestedDate.Month(), requestedDate.Day(), 0, 0, 0, 0, location)
 	endOfDay := startOfDay.Add(30 * time.Hour)
 
-	rows, err := config.DB.Query(`
+	rows, err := config.DB.Query(fmt.Sprintf(`
 		SELECT horario
-		FROM agendamentos
+		FROM %s
 		WHERE id_campo = $1
 		  AND horario >= $2
 		  AND horario < $3
 		  AND status != 'cancelado'
 		ORDER BY horario ASC
-	`, campoID, startOfDay, endOfDay)
+	`, agendamentosTableName()), campoID, startOfDay, endOfDay)
 	if err != nil {
 		return nil, err
 	}
