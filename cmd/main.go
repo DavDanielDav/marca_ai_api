@@ -108,6 +108,7 @@ func main() {
 	r.HandleFunc("/forgot-password/reset-password", handlers.ResetForgotPassword).Methods("POST")
 	r.HandleFunc("/ajogador", handlers.GetArenasJogador).Methods("GET")
 	r.HandleFunc("/horarios-disponiveis", handlers.GetHorariosDisponiveisCampo).Methods("GET")
+	r.HandleFunc("/integracao/agendamentos", handlers.CriarPedidoAgendamentoJogador).Methods("POST")
 
 	authRouter := r.PathPrefix("").Subrouter()
 	authRouter.Use(middleware.AuthMiddleware)
@@ -128,6 +129,9 @@ func main() {
 	authRouter.HandleFunc("/excluir-campo/{id}", handlers.DeleteCampo).Methods("DELETE")
 	authRouter.HandleFunc("/cadastrar-agendamento", handlers.AgendarCampo).Methods("POST")
 	authRouter.HandleFunc("/agendamentos", handlers.GetAgendamentos).Methods("GET")
+	authRouter.HandleFunc("/pedidos", handlers.GetPedidos).Methods("GET")
+	authRouter.HandleFunc("/pedidos/{id}/aceitar", handlers.AceitarPedido).Methods("PUT")
+	authRouter.HandleFunc("/pedidos/{id}/cancelar", handlers.CancelarPedido).Methods("PUT")
 	authRouter.HandleFunc("/agendamentos/status", handlers.AtualizarStatusAgendamento).Methods("PUT")
 	authRouter.HandleFunc("/editar-agendamento", handlers.EditarAgendamento).Methods("PUT")
 	authRouter.HandleFunc("/dashboard", handlers.GetDashboard).Methods("GET")

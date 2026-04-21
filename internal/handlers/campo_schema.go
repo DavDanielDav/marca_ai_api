@@ -18,7 +18,7 @@ func loadCampoOptionalColumns(ctx context.Context) (campoOptionalColumns, error)
 	rows, err := config.DB.QueryContext(ctx, `
 		SELECT column_name
 		FROM information_schema.columns
-		WHERE table_schema = 'public'
+		WHERE table_schema IN ('public', 'arena')
 		  AND table_name = 'campo'
 		  AND column_name IN ('valor_hora', 'ativo', 'horarios_disponiveis')
 	`)

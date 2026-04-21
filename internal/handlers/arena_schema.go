@@ -18,7 +18,7 @@ func loadArenaOptionalColumns(ctx context.Context) (arenaOptionalColumns, error)
 	rows, err := config.DB.QueryContext(ctx, `
 		SELECT column_name
 		FROM information_schema.columns
-		WHERE table_schema = 'public'
+		WHERE table_schema IN ('public', 'arena')
 		  AND table_name = 'arenas'
 		  AND column_name IN ('observacoes', 'esportes_oferecidos', 'informacoes_arena')
 	`)
