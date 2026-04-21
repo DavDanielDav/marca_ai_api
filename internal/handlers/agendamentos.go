@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -32,6 +33,12 @@ type agendamentoStatusRequest struct {
 	Status string `json:"status"`
 }
 
+type agendamentoPagamentoRequest struct {
+	IDUsuario      *int    `json:"id_usuario"`
+	ValorPago      float64 `json:"valor_pago"`
+	FormaPagamento string  `json:"forma_pagamento"`
+}
+
 type agendamentoResponse struct {
 	ID                int     `json:"id"`
 	IDUsuario         int     `json:"id_usuario,omitempty"`
@@ -49,9 +56,30 @@ type agendamentoResponse struct {
 	OrigemAgendamento string  `json:"origem_agendamento"`
 	ValorTotal        float64 `json:"valor_total"`
 	ValorRestante     float64 `json:"valor_restante"`
+	StatusDePagamento bool    `json:"status_de_pagamento"`
+	InicioCronometro  *int64  `json:"inicio_cronometro,omitempty"`
+	FimCronometro     string  `json:"fim_cronometro,omitempty"`
 	Time1             string  `json:"time1,omitempty"`
 	Time2             string  `json:"time2,omitempty"`
 	ModoDeJogo        string  `json:"modo_de_jogo,omitempty"`
+}
+
+type agendamentoPagamentoResponse struct {
+	ID               int     `json:"id"`
+	IDAgendamento    int     `json:"id_agendamento"`
+	IDUsuario        *int    `json:"id_usuario,omitempty"`
+	ValorPago        float64 `json:"valor_pago"`
+	FormaPagamento   string  `json:"forma_pagamento"`
+	DataPagamento    string  `json:"data_pagamento"`
+	NomeUsuario      string  `json:"nome_usuario,omitempty"`
+	SobrenomeUsuario string  `json:"sobrenome_usuario,omitempty"`
+	EmailUsuario     string  `json:"email_usuario,omitempty"`
+}
+
+type agendamentoPagamentosResumoResponse struct {
+	Agendamento agendamentoResponse            `json:"agendamento"`
+	Pagamentos  []agendamentoPagamentoResponse `json:"pagamentos"`
+	TotalPago   float64                        `json:"total_pago"`
 }
 
 func AgendarCampo(w http.ResponseWriter, r *http.Request) {
@@ -278,6 +306,160 @@ func EditarAgendamento(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func IniciarCronometroAgendamento(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		http.Error(w, "Usuario nao autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	agendamentoID, err := resolveAgendamentoID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	service := newAgendamentoService()
+	agendamento, err := service.IniciarCronometro(r.Context(), userID, agendamentoID)
+	if err != nil {
+		writeAgendamentoServiceError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"message":     "Cronometro iniciado com sucesso",
+		"agendamento": newAgendamentoResponse(agendamento),
+	})
+}
+
+func EncerrarCronometroAgendamento(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		http.Error(w, "Usuario nao autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	agendamentoID, err := resolveAgendamentoID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	service := newAgendamentoService()
+	agendamento, err := service.EncerrarCronometro(r.Context(), userID, agendamentoID)
+	if err != nil {
+		writeAgendamentoServiceError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"message":     "Cronometro encerrado com sucesso",
+		"agendamento": newAgendamentoResponse(agendamento),
+	})
+}
+
+func GetPagamentosAgendamento(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		http.Error(w, "Usuario nao autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	agendamentoID, err := resolveAgendamentoID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	service := newAgendamentoService()
+	resumo, err := service.GetPagamentosResumo(r.Context(), userID, agendamentoID)
+	if err != nil {
+		writeAgendamentoServiceError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, newAgendamentoPagamentosResumoResponse(resumo))
+}
+
+func RegistrarPagamentoParcialAgendamento(w http.ResponseWriter, r *http.Request) {
+	handlePagamentoAgendamento(w, r, false)
+}
+
+func RegistrarPagamentoTotalAgendamento(w http.ResponseWriter, r *http.Request) {
+	handlePagamentoAgendamento(w, r, true)
+}
+
+func ConcluirAgendamento(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		http.Error(w, "Usuario nao autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	agendamentoID, err := resolveAgendamentoID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	service := newAgendamentoService()
+	result, err := service.Concluir(r.Context(), userID, agendamentoID)
+	if err != nil {
+		writeAgendamentoServiceError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"message":     "Agendamento concluido com sucesso",
+		"agendamento": newAgendamentoResponse(result.Agendamento),
+		"notificacao": result.Notificacao,
+	})
+}
+
+func handlePagamentoAgendamento(w http.ResponseWriter, r *http.Request, pagamentoTotal bool) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		http.Error(w, "Usuario nao autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	agendamentoID, err := resolveAgendamentoID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	input, err := parsePagamentoAgendamentoRequest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	service := newAgendamentoService()
+	var result agendamentoPagamentoMutationResult
+	if pagamentoTotal {
+		result, err = service.RegistrarPagamentoTotal(r.Context(), userID, agendamentoID, input)
+	} else {
+		result, err = service.RegistrarPagamentoParcial(r.Context(), userID, agendamentoID, input)
+	}
+	if err != nil {
+		writeAgendamentoServiceError(w, err)
+		return
+	}
+
+	message := "Pagamento parcial registrado com sucesso"
+	if pagamentoTotal {
+		message = "Pagamento total registrado com sucesso"
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"message":     message,
+		"agendamento": newAgendamentoResponse(result.Agendamento),
+		"pagamento":   newAgendamentoPagamentoResponse(result.Pagamento),
+		"total_pago":  result.TotalPago,
+	})
+}
+
 func parseAgendamentoCreateRequest(r *http.Request) (models.CreateAgendamentoInput, error) {
 	var request agendamentoCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -321,6 +503,22 @@ func parseAgendamentoCreateRequest(r *http.Request) (models.CreateAgendamentoInp
 		Time1:             strings.TrimSpace(request.Time1),
 		Time2:             strings.TrimSpace(request.Time2),
 		ModoDeJogo:        strings.TrimSpace(request.ModoDeJogo),
+	}, nil
+}
+
+func parsePagamentoAgendamentoRequest(r *http.Request) (models.RegistrarPagamentoInput, error) {
+	var request agendamentoPagamentoRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		if errors.Is(err, io.EOF) {
+			return models.RegistrarPagamentoInput{}, nil
+		}
+		return models.RegistrarPagamentoInput{}, errors.New("Erro ao decodificar JSON")
+	}
+
+	return models.RegistrarPagamentoInput{
+		IDUsuario:      request.IDUsuario,
+		ValorPago:      request.ValorPago,
+		FormaPagamento: strings.TrimSpace(request.FormaPagamento),
 	}, nil
 }
 
@@ -418,6 +616,8 @@ func newAgendamentoResponse(agendamento models.Agendamento) agendamentoResponse 
 		OrigemAgendamento: string(agendamento.OrigemAgendamento),
 		ValorTotal:        agendamento.ValorTotal,
 		ValorRestante:     agendamento.ValorRestante,
+		StatusDePagamento: agendamento.StatusDePagamento,
+		InicioCronometro:  agendamento.InicioCronometro,
 		Time1:             agendamento.Time1,
 		Time2:             agendamento.Time2,
 		ModoDeJogo:        agendamento.ModoDeJogo,
@@ -426,8 +626,38 @@ func newAgendamentoResponse(agendamento models.Agendamento) agendamentoResponse 
 	if !agendamento.CriadoEm.IsZero() {
 		response.CriadoEm = agendamento.CriadoEm.Format(time.RFC3339)
 	}
+	if agendamento.FimCronometro != nil && !agendamento.FimCronometro.IsZero() {
+		response.FimCronometro = agendamento.FimCronometro.Format(time.RFC3339)
+	}
 
 	return response
+}
+
+func newAgendamentoPagamentoResponse(pagamento models.AgendamentoPagamento) agendamentoPagamentoResponse {
+	return agendamentoPagamentoResponse{
+		ID:               pagamento.ID,
+		IDAgendamento:    pagamento.IDAgendamento,
+		IDUsuario:        pagamento.IDUsuario,
+		ValorPago:        pagamento.ValorPago,
+		FormaPagamento:   pagamento.FormaPagamento,
+		DataPagamento:    pagamento.DataPagamento.Format(time.RFC3339),
+		NomeUsuario:      pagamento.NomeUsuario,
+		SobrenomeUsuario: pagamento.SobrenomeUsuario,
+		EmailUsuario:     pagamento.EmailUsuario,
+	}
+}
+
+func newAgendamentoPagamentosResumoResponse(resumo models.AgendamentoPagamentosResumo) agendamentoPagamentosResumoResponse {
+	pagamentos := make([]agendamentoPagamentoResponse, 0, len(resumo.Pagamentos))
+	for _, pagamento := range resumo.Pagamentos {
+		pagamentos = append(pagamentos, newAgendamentoPagamentoResponse(pagamento))
+	}
+
+	return agendamentoPagamentosResumoResponse{
+		Agendamento: newAgendamentoResponse(resumo.Agendamento),
+		Pagamentos:  pagamentos,
+		TotalPago:   resumo.TotalPago,
+	}
 }
 
 func writeAgendamentoServiceError(w http.ResponseWriter, err error) {
@@ -450,6 +680,18 @@ func writeAgendamentoServiceError(w http.ResponseWriter, err error) {
 		http.Error(w, "Status do agendamento invalido", http.StatusBadRequest)
 	case errors.Is(err, errAgendamentoPedidoNaoPendente):
 		http.Error(w, "O pedido informado nao esta com status pendente", http.StatusBadRequest)
+	case errors.Is(err, errAgendamentoCronometroNaoIniciado):
+		http.Error(w, "O cronometro ainda nao foi iniciado", http.StatusBadRequest)
+	case errors.Is(err, errAgendamentoCronometroNaoEncerrado):
+		http.Error(w, "O cronometro precisa ser encerrado antes da conclusao", http.StatusBadRequest)
+	case errors.Is(err, errAgendamentoConclusaoBloqueada):
+		http.Error(w, "O agendamento ainda possui saldo pendente", http.StatusBadRequest)
+	case errors.Is(err, errAgendamentoPagamentoInvalido):
+		http.Error(w, "Pagamento invalido", http.StatusBadRequest)
+	case errors.Is(err, errAgendamentoSemSaldoPendente):
+		http.Error(w, "O agendamento nao possui saldo pendente", http.StatusBadRequest)
+	case errors.Is(err, errAgendamentoEstadoOperacaoInvalido):
+		http.Error(w, "O estado atual do agendamento nao permite esta operacao", http.StatusBadRequest)
 	default:
 		http.Error(w, "Erro interno ao processar agendamento", http.StatusInternalServerError)
 	}

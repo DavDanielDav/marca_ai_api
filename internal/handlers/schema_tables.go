@@ -29,3 +29,11 @@ func pagamentosPorAgendamentoTableName() string {
 func emailCodesTableName() string {
 	return arenaTableName("email_codes")
 }
+
+func jogadorTableName(table string) string {
+	return config.QualifiedNameForSchema("jogador", table)
+}
+
+func usuarioJogadorTableName() string {
+	return jogadorTableName("usuario_jogador")
+}

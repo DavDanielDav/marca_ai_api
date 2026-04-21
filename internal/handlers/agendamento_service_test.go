@@ -37,3 +37,23 @@ func TestShouldNotifyJogadorOnlyForExternalAcceptedOrCanceled(t *testing.T) {
 		t.Fatal("pending request should not trigger notification")
 	}
 }
+
+func TestResolveFinancialStateSupportsLegacyPaidFlag(t *testing.T) {
+	valorRestante, pago, statusDePagamento := resolveFinancialState(180, 0, true, true)
+	if valorRestante != 0 {
+		t.Fatalf("expected remaining value 0 for legacy paid flag, got %v", valorRestante)
+	}
+	if !pago || !statusDePagamento {
+		t.Fatal("expected financial flags to remain paid when legacy flag is set")
+	}
+}
+
+func TestStatusAfterCronometroEncerradoDependsOnRemainingValue(t *testing.T) {
+	if got := statusAfterCronometroEncerrado(50); got != models.AgendamentoStatusAguardandoPagamento {
+		t.Fatalf("expected awaiting payment status, got %q", got)
+	}
+
+	if got := statusAfterCronometroEncerrado(0); got != models.AgendamentoStatusAgendado {
+		t.Fatalf("expected agendado status when remaining is zero, got %q", got)
+	}
+}

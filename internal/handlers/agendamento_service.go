@@ -5,25 +5,38 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/danpi/marca_ai_backend/internal/models"
 )
 
 var (
-	errAgendamentoCampoNaoEncontrado  = errors.New("campo nao encontrado")
-	errAgendamentoCampoSemPermissao   = errors.New("campo nao pertence ao usuario")
-	errAgendamentoNaoEncontrado       = errors.New("agendamento nao encontrado")
-	errAgendamentoOrigemInvalida      = errors.New("origem do agendamento invalida")
-	errAgendamentoStatusInvalido      = errors.New("status do agendamento invalido")
-	errAgendamentoHorarioIndisponivel = errors.New("horario indisponivel")
-	errAgendamentoCampoIndisponivel   = errors.New("campo indisponivel para agendamento")
-	errAgendamentoJogadoresInvalidos  = errors.New("quantidade de jogadores invalida")
-	errAgendamentoPedidoNaoPendente   = errors.New("pedido nao esta pendente")
+	errAgendamentoCampoNaoEncontrado     = errors.New("campo nao encontrado")
+	errAgendamentoCampoSemPermissao      = errors.New("campo nao pertence ao usuario")
+	errAgendamentoNaoEncontrado          = errors.New("agendamento nao encontrado")
+	errAgendamentoOrigemInvalida         = errors.New("origem do agendamento invalida")
+	errAgendamentoStatusInvalido         = errors.New("status do agendamento invalido")
+	errAgendamentoHorarioIndisponivel    = errors.New("horario indisponivel")
+	errAgendamentoCampoIndisponivel      = errors.New("campo indisponivel para agendamento")
+	errAgendamentoJogadoresInvalidos     = errors.New("quantidade de jogadores invalida")
+	errAgendamentoPedidoNaoPendente      = errors.New("pedido nao esta pendente")
+	errAgendamentoCronometroNaoIniciado  = errors.New("cronometro nao iniciado")
+	errAgendamentoCronometroNaoEncerrado = errors.New("cronometro nao encerrado")
+	errAgendamentoConclusaoBloqueada     = errors.New("agendamento ainda possui saldo pendente")
+	errAgendamentoPagamentoInvalido      = errors.New("pagamento invalido")
+	errAgendamentoSemSaldoPendente       = errors.New("agendamento nao possui saldo pendente")
+	errAgendamentoEstadoOperacaoInvalido = errors.New("estado atual do agendamento nao permite esta operacao")
 )
 
 type agendamentoMutationResult struct {
 	Agendamento models.Agendamento        `json:"agendamento"`
 	Notificacao jogadorNotificationResult `json:"notificacao"`
+}
+
+type agendamentoPagamentoMutationResult struct {
+	Agendamento models.Agendamento          `json:"agendamento"`
+	Pagamento   models.AgendamentoPagamento `json:"pagamento"`
+	TotalPago   float64                     `json:"total_pago"`
 }
 
 type agendamentoService struct {
@@ -85,14 +98,19 @@ func (service agendamentoService) Edit(ctx context.Context, ownerUserID int, age
 	}
 
 	valorTotal := campo.ValorHora
-	valorRestante := calcularValorRestante(valorTotal, totalPago)
+	valorRestante, pago, statusDePagamento := resolveFinancialState(
+		valorTotal,
+		totalPago,
+		agendamentoAtual.Pago || input.Pago,
+		agendamentoAtual.StatusDePagamento || input.Pago,
+	)
 
 	err = service.repository.update(ctx, agendamentoID, agendamentoUpdateInput{
 		IDCampo:       input.IDCampo,
 		Horario:       input.Horario,
 		Jogadores:     input.Jogadores,
 		Pagamento:     input.Pagamento,
-		Pago:          input.Pago,
+		Pago:          pago,
 		ValorTotal:    valorTotal,
 		ValorRestante: valorRestante,
 	})
@@ -105,7 +123,8 @@ func (service agendamentoService) Edit(ctx context.Context, ownerUserID int, age
 	agendamentoAtual.Horario = input.Horario
 	agendamentoAtual.Jogadores = input.Jogadores
 	agendamentoAtual.Pagamento = input.Pagamento
-	agendamentoAtual.Pago = input.Pago
+	agendamentoAtual.Pago = pago
+	agendamentoAtual.StatusDePagamento = statusDePagamento
 	agendamentoAtual.NomeCampo = campo.NomeCampo
 	agendamentoAtual.NomeArena = campo.NomeArena
 	agendamentoAtual.ValorTotal = valorTotal
@@ -115,8 +134,12 @@ func (service agendamentoService) Edit(ctx context.Context, ownerUserID int, age
 }
 
 func (service agendamentoService) UpdateStatus(ctx context.Context, ownerUserID int, agendamentoID int, status models.AgendamentoStatus) (agendamentoMutationResult, error) {
+	if status == models.AgendamentoStatusConcluido {
+		return service.Concluir(ctx, ownerUserID, agendamentoID)
+	}
+
 	switch status {
-	case models.AgendamentoStatusAgendado, models.AgendamentoStatusCancelado, models.AgendamentoStatusConcluido, models.AgendamentoStatusPedido:
+	case models.AgendamentoStatusAgendado, models.AgendamentoStatusCancelado, models.AgendamentoStatusPedido:
 	default:
 		return agendamentoMutationResult{}, errAgendamentoStatusInvalido
 	}
@@ -164,6 +187,209 @@ func (service agendamentoService) CancelPedido(ctx context.Context, ownerUserID 
 	return service.transitionStatus(ctx, agendamento, models.AgendamentoStatusCancelado)
 }
 
+func (service agendamentoService) IniciarCronometro(ctx context.Context, ownerUserID int, agendamentoID int) (models.Agendamento, error) {
+	agendamento, err := service.repository.getByIDForOwner(ctx, agendamentoID, ownerUserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.Agendamento{}, errAgendamentoNaoEncontrado
+		}
+		return models.Agendamento{}, err
+	}
+
+	if !canManageExecutionState(agendamento.Status) {
+		return models.Agendamento{}, errAgendamentoEstadoOperacaoInvalido
+	}
+
+	inicioUnix := time.Now().Unix()
+	if err := service.repository.startCronometro(ctx, agendamentoID, inicioUnix); err != nil {
+		return models.Agendamento{}, err
+	}
+
+	agendamento.Status = models.AgendamentoStatusEmAndamento
+	agendamento.InicioCronometro = &inicioUnix
+	agendamento.FimCronometro = nil
+	return agendamento, nil
+}
+
+func (service agendamentoService) EncerrarCronometro(ctx context.Context, ownerUserID int, agendamentoID int) (models.Agendamento, error) {
+	agendamento, err := service.repository.getByIDForOwner(ctx, agendamentoID, ownerUserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.Agendamento{}, errAgendamentoNaoEncontrado
+		}
+		return models.Agendamento{}, err
+	}
+
+	if !canManageExecutionState(agendamento.Status) {
+		return models.Agendamento{}, errAgendamentoEstadoOperacaoInvalido
+	}
+	if agendamento.InicioCronometro == nil {
+		return models.Agendamento{}, errAgendamentoCronometroNaoIniciado
+	}
+
+	agendamento, _, err = service.refreshFinancialState(ctx, agendamento)
+	if err != nil {
+		return models.Agendamento{}, err
+	}
+
+	nextStatus := statusAfterCronometroEncerrado(agendamento.ValorRestante)
+	fim := time.Now()
+	if err := service.repository.finishCronometro(ctx, agendamentoID, fim, nextStatus); err != nil {
+		return models.Agendamento{}, err
+	}
+
+	agendamento.Status = nextStatus
+	agendamento.FimCronometro = &fim
+	return agendamento, nil
+}
+
+func (service agendamentoService) GetPagamentosResumo(ctx context.Context, ownerUserID int, agendamentoID int) (models.AgendamentoPagamentosResumo, error) {
+	agendamento, err := service.repository.getByIDForOwner(ctx, agendamentoID, ownerUserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.AgendamentoPagamentosResumo{}, errAgendamentoNaoEncontrado
+		}
+		return models.AgendamentoPagamentosResumo{}, err
+	}
+
+	agendamento, totalPago, err := service.refreshFinancialState(ctx, agendamento)
+	if err != nil {
+		return models.AgendamentoPagamentosResumo{}, err
+	}
+
+	pagamentos, err := service.repository.listPayments(ctx, agendamentoID)
+	if err != nil {
+		return models.AgendamentoPagamentosResumo{}, err
+	}
+
+	return models.AgendamentoPagamentosResumo{
+		Agendamento: agendamento,
+		Pagamentos:  pagamentos,
+		TotalPago:   totalPago,
+	}, nil
+}
+
+func (service agendamentoService) RegistrarPagamentoParcial(ctx context.Context, ownerUserID int, agendamentoID int, input models.RegistrarPagamentoInput) (agendamentoPagamentoMutationResult, error) {
+	if input.ValorPago <= 0 {
+		return agendamentoPagamentoMutationResult{}, errAgendamentoPagamentoInvalido
+	}
+
+	agendamento, err := service.repository.getByIDForOwner(ctx, agendamentoID, ownerUserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return agendamentoPagamentoMutationResult{}, errAgendamentoNaoEncontrado
+		}
+		return agendamentoPagamentoMutationResult{}, err
+	}
+
+	if !canRegisterPayment(agendamento.Status) {
+		return agendamentoPagamentoMutationResult{}, errAgendamentoEstadoOperacaoInvalido
+	}
+
+	agendamento, totalPagoAtual, err := service.refreshFinancialState(ctx, agendamento)
+	if err != nil {
+		return agendamentoPagamentoMutationResult{}, err
+	}
+
+	if agendamento.ValorRestante <= 0 {
+		return agendamentoPagamentoMutationResult{}, errAgendamentoSemSaldoPendente
+	}
+	if input.ValorPago > agendamento.ValorRestante {
+		return agendamentoPagamentoMutationResult{}, errAgendamentoPagamentoInvalido
+	}
+
+	input.FormaPagamento = sanitizePagamento(input.FormaPagamento)
+	if input.FormaPagamento == "" {
+		input.FormaPagamento = sanitizePagamento(agendamento.Pagamento)
+	}
+	pagamento, err := service.repository.insertPayment(ctx, agendamentoID, input)
+	if err != nil {
+		return agendamentoPagamentoMutationResult{}, err
+	}
+
+	totalPago := totalPagoAtual + input.ValorPago
+	valorRestante, pago, statusDePagamento := resolveFinancialState(
+		agendamento.ValorTotal,
+		totalPago,
+		agendamento.Pago,
+		agendamento.StatusDePagamento,
+	)
+
+	statusUpdate := statusAfterPayment(agendamento, valorRestante)
+	if err := service.repository.updateFinancialState(ctx, agendamentoID, agendamentoFinancialUpdate{
+		ValorRestante:     valorRestante,
+		Pago:              pago,
+		StatusDePagamento: statusDePagamento,
+		Status:            statusUpdate,
+	}); err != nil {
+		return agendamentoPagamentoMutationResult{}, err
+	}
+
+	agendamento.ValorRestante = valorRestante
+	agendamento.Pago = pago
+	agendamento.StatusDePagamento = statusDePagamento
+	if statusUpdate != nil {
+		agendamento.Status = *statusUpdate
+	}
+
+	return agendamentoPagamentoMutationResult{
+		Agendamento: agendamento,
+		Pagamento:   pagamento,
+		TotalPago:   totalPago,
+	}, nil
+}
+
+func (service agendamentoService) RegistrarPagamentoTotal(ctx context.Context, ownerUserID int, agendamentoID int, input models.RegistrarPagamentoInput) (agendamentoPagamentoMutationResult, error) {
+	agendamento, err := service.repository.getByIDForOwner(ctx, agendamentoID, ownerUserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return agendamentoPagamentoMutationResult{}, errAgendamentoNaoEncontrado
+		}
+		return agendamentoPagamentoMutationResult{}, err
+	}
+
+	if !canRegisterPayment(agendamento.Status) {
+		return agendamentoPagamentoMutationResult{}, errAgendamentoEstadoOperacaoInvalido
+	}
+
+	agendamento, _, err = service.refreshFinancialState(ctx, agendamento)
+	if err != nil {
+		return agendamentoPagamentoMutationResult{}, err
+	}
+
+	if agendamento.ValorRestante <= 0 {
+		return agendamentoPagamentoMutationResult{}, errAgendamentoSemSaldoPendente
+	}
+
+	input.ValorPago = agendamento.ValorRestante
+	return service.RegistrarPagamentoParcial(ctx, ownerUserID, agendamentoID, input)
+}
+
+func (service agendamentoService) Concluir(ctx context.Context, ownerUserID int, agendamentoID int) (agendamentoMutationResult, error) {
+	agendamento, err := service.repository.getByIDForOwner(ctx, agendamentoID, ownerUserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return agendamentoMutationResult{}, errAgendamentoNaoEncontrado
+		}
+		return agendamentoMutationResult{}, err
+	}
+
+	if agendamento.FimCronometro == nil {
+		return agendamentoMutationResult{}, errAgendamentoCronometroNaoEncerrado
+	}
+
+	agendamento, _, err = service.refreshFinancialState(ctx, agendamento)
+	if err != nil {
+		return agendamentoMutationResult{}, err
+	}
+
+	if agendamento.ValorRestante > 0 {
+		return agendamentoMutationResult{}, errAgendamentoConclusaoBloqueada
+	}
+
+	return service.transitionStatus(ctx, agendamento, models.AgendamentoStatusConcluido)
+}
+
 func (service agendamentoService) create(ctx context.Context, input models.CreateAgendamentoInput, ownerUserID int, status models.AgendamentoStatus) (models.Agendamento, error) {
 	campo, err := service.validateCampoAndSchedule(ctx, input, ownerUserID, nil)
 	if err != nil {
@@ -171,7 +397,7 @@ func (service agendamentoService) create(ctx context.Context, input models.Creat
 	}
 
 	valorTotal := campo.ValorHora
-	valorRestante := valorTotal
+	valorRestante, pago, statusDePagamento := resolveFinancialState(valorTotal, 0, input.Pago, input.Pago)
 
 	agendamento, err := service.repository.create(ctx, input, status, valorTotal, valorRestante)
 	if err != nil {
@@ -181,6 +407,8 @@ func (service agendamentoService) create(ctx context.Context, input models.Creat
 	agendamento.IDArena = campo.IDArena
 	agendamento.NomeCampo = campo.NomeCampo
 	agendamento.NomeArena = campo.NomeArena
+	agendamento.Pago = pago
+	agendamento.StatusDePagamento = statusDePagamento
 	return agendamento, nil
 }
 
@@ -240,6 +468,75 @@ func (service agendamentoService) transitionStatus(ctx context.Context, agendame
 		Agendamento: agendamento,
 		Notificacao: notificacao,
 	}, nil
+}
+
+func (service agendamentoService) refreshFinancialState(ctx context.Context, agendamento models.Agendamento) (models.Agendamento, float64, error) {
+	totalPagoRegistrado, err := service.repository.sumPayments(ctx, agendamento.ID)
+	if err != nil {
+		return models.Agendamento{}, 0, err
+	}
+
+	valorRestante, pago, statusDePagamento := resolveFinancialState(
+		agendamento.ValorTotal,
+		totalPagoRegistrado,
+		agendamento.Pago,
+		agendamento.StatusDePagamento,
+	)
+
+	totalPago := agendamento.ValorTotal - valorRestante
+	if totalPago < 0 {
+		totalPago = 0
+	}
+
+	agendamento.ValorRestante = valorRestante
+	agendamento.Pago = pago
+	agendamento.StatusDePagamento = statusDePagamento
+	return agendamento, totalPago, nil
+}
+
+func canManageExecutionState(status models.AgendamentoStatus) bool {
+	switch status {
+	case models.AgendamentoStatusCancelado, models.AgendamentoStatusConcluido:
+		return false
+	default:
+		return true
+	}
+}
+
+func canRegisterPayment(status models.AgendamentoStatus) bool {
+	switch status {
+	case models.AgendamentoStatusCancelado, models.AgendamentoStatusConcluido:
+		return false
+	default:
+		return true
+	}
+}
+
+func statusAfterCronometroEncerrado(valorRestante float64) models.AgendamentoStatus {
+	if valorRestante > 0 {
+		return models.AgendamentoStatusAguardandoPagamento
+	}
+
+	return models.AgendamentoStatusAgendado
+}
+
+func statusAfterPayment(agendamento models.Agendamento, valorRestante float64) *models.AgendamentoStatus {
+	if agendamento.FimCronometro == nil {
+		return nil
+	}
+
+	status := statusAfterCronometroEncerrado(valorRestante)
+	return &status
+}
+
+func resolveFinancialState(valorTotal float64, totalPago float64, pagoFlag bool, statusDePagamento bool) (float64, bool, bool) {
+	valorRestante := calcularValorRestante(valorTotal, totalPago)
+	if totalPago == 0 && (pagoFlag || statusDePagamento) {
+		valorRestante = 0
+	}
+
+	quitado := valorRestante <= 0
+	return valorRestante, quitado, quitado
 }
 
 func shouldNotifyJogador(agendamento models.Agendamento) bool {

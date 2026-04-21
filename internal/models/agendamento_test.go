@@ -29,3 +29,20 @@ func TestNormalizeAgendamentoStatusSupportsLegacyAccent(t *testing.T) {
 		t.Fatalf("expected status %q, got %q", AgendamentoStatusConcluido, got)
 	}
 }
+
+func TestNormalizeAgendamentoStatusSupportsExecutionAndPaymentStates(t *testing.T) {
+	tests := map[string]AgendamentoStatus{
+		"em_andamento":         AgendamentoStatusEmAndamento,
+		"aguardando_pagamento": AgendamentoStatusAguardandoPagamento,
+	}
+
+	for raw, expected := range tests {
+		got, ok := NormalizeAgendamentoStatus(raw)
+		if !ok {
+			t.Fatalf("expected status %q to be valid", raw)
+		}
+		if got != expected {
+			t.Fatalf("expected status %q, got %q", expected, got)
+		}
+	}
+}

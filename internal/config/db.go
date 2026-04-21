@@ -43,7 +43,16 @@ func DBSchemaName() string {
 }
 
 func QualifiedName(name string) string {
-	return fmt.Sprintf("%s.%s", quoteIdentifier(DBSchemaName()), quoteIdentifier(strings.TrimSpace(name)))
+	return QualifiedNameForSchema(DBSchemaName(), name)
+}
+
+func QualifiedNameForSchema(schema string, name string) string {
+	schema = sanitizeIdentifier(schema)
+	if schema == "" {
+		schema = DBSchemaName()
+	}
+
+	return fmt.Sprintf("%s.%s", quoteIdentifier(schema), quoteIdentifier(strings.TrimSpace(name)))
 }
 
 func normalizeSearchPath(value string) string {

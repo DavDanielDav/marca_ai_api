@@ -36,6 +36,13 @@ type agendamentoUpdateInput struct {
 	ValorRestante float64
 }
 
+type agendamentoFinancialUpdate struct {
+	ValorRestante     float64
+	Pago              bool
+	StatusDePagamento bool
+	Status            *models.AgendamentoStatus
+}
+
 func newAgendamentoRepository() agendamentoRepository {
 	return agendamentoRepository{}
 }
@@ -139,11 +146,15 @@ func (agendamentoRepository) create(ctx context.Context, input models.CreateAgen
 			pagamento,
 			pago,
 			status,
+			status_de_pagamento,
 			origem_agendamento,
 			valor_total,
-			valor_restante
+			valor_restante,
+			time1,
+			time2,
+			modo_de_jogo
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NULLIF($12, ''), NULLIF($13, ''), NULLIF($14, ''))
 		RETURNING id_agendamento, COALESCE(criado_em, NOW())
 	`, agendamentosTableName())
 
@@ -158,9 +169,13 @@ func (agendamentoRepository) create(ctx context.Context, input models.CreateAgen
 		input.Pagamento,
 		input.Pago,
 		string(status),
+		input.Pago,
 		string(input.OrigemAgendamento),
 		valorTotal,
 		valorRestante,
+		input.Time1,
+		input.Time2,
+		input.ModoDeJogo,
 	).Scan(&agendamento.ID, &agendamento.CriadoEm)
 	if err != nil {
 		return models.Agendamento{}, err
@@ -174,10 +189,14 @@ func (agendamentoRepository) create(ctx context.Context, input models.CreateAgen
 	agendamento.Jogadores = input.Jogadores
 	agendamento.Pagamento = input.Pagamento
 	agendamento.Pago = input.Pago
+	agendamento.StatusDePagamento = input.Pago
 	agendamento.Status = status
 	agendamento.OrigemAgendamento = input.OrigemAgendamento
 	agendamento.ValorTotal = valorTotal
 	agendamento.ValorRestante = valorRestante
+	agendamento.Time1 = input.Time1
+	agendamento.Time2 = input.Time2
+	agendamento.ModoDeJogo = input.ModoDeJogo
 	return agendamento, nil
 }
 
@@ -197,9 +216,11 @@ func (repository agendamentoRepository) listByOwner(ctx context.Context, ownerUs
 			CASE a.status
 				WHEN 'pedido' THEN 0
 				WHEN 'agendado' THEN 1
-				WHEN 'concluido' THEN 2
-				WHEN 'cancelado' THEN 3
-				ELSE 4
+				WHEN 'em_andamento' THEN 2
+				WHEN 'aguardando_pagamento' THEN 3
+				WHEN 'concluido' THEN 4
+				WHEN 'cancelado' THEN 5
+				ELSE 6
 			END,
 			a.horario DESC
 	`, agendamentoBaseSelectQuery(), strings.Join(where, " AND "))
@@ -257,20 +278,160 @@ func (agendamentoRepository) update(ctx context.Context, agendamentoID int, inpu
 			jogadores = $3,
 			pagamento = $4,
 			pago = $5,
-			valor_total = $6,
-			valor_restante = $7
-		WHERE id_agendamento = $8
+			status_de_pagamento = $6,
+			valor_total = $7,
+			valor_restante = $8
+		WHERE id_agendamento = $9
 	`, agendamentosTableName()),
 		input.IDCampo,
 		input.Horario,
 		input.Jogadores,
 		input.Pagamento,
 		input.Pago,
+		input.Pago,
 		input.ValorTotal,
 		input.ValorRestante,
 		agendamentoID,
 	)
 	return err
+}
+
+func (agendamentoRepository) startCronometro(ctx context.Context, agendamentoID int, inicioUnix int64) error {
+	_, err := config.DB.ExecContext(ctx, fmt.Sprintf(`
+		UPDATE %s
+		SET
+			inicio_cronometro = $1,
+			fim_cronometro = NULL,
+			status = $2
+		WHERE id_agendamento = $3
+	`, agendamentosTableName()), inicioUnix, string(models.AgendamentoStatusEmAndamento), agendamentoID)
+	return err
+}
+
+func (agendamentoRepository) finishCronometro(ctx context.Context, agendamentoID int, fim time.Time, status models.AgendamentoStatus) error {
+	_, err := config.DB.ExecContext(ctx, fmt.Sprintf(`
+		UPDATE %s
+		SET
+			fim_cronometro = $1,
+			status = $2
+		WHERE id_agendamento = $3
+	`, agendamentosTableName()), fim, string(status), agendamentoID)
+	return err
+}
+
+func (agendamentoRepository) updateFinancialState(ctx context.Context, agendamentoID int, input agendamentoFinancialUpdate) error {
+	query := fmt.Sprintf(`
+		UPDATE %s
+		SET
+			valor_restante = $1,
+			pago = $2,
+			status_de_pagamento = $3
+	`, agendamentosTableName())
+
+	args := []any{input.ValorRestante, input.Pago, input.StatusDePagamento}
+	if input.Status != nil {
+		query += ", status = $4"
+		args = append(args, string(*input.Status))
+	}
+
+	query += fmt.Sprintf(" WHERE id_agendamento = $%d", len(args)+1)
+	args = append(args, agendamentoID)
+
+	_, err := config.DB.ExecContext(ctx, query, args...)
+	return err
+}
+
+func (agendamentoRepository) insertPayment(ctx context.Context, agendamentoID int, input models.RegistrarPagamentoInput) (models.AgendamentoPagamento, error) {
+	query := fmt.Sprintf(`
+		INSERT INTO %s (
+			id_agendamento,
+			id_usuario,
+			valor_pago,
+			forma_pagamento,
+			data_pagamento
+		)
+		VALUES ($1, $2, $3, $4, NOW())
+		RETURNING id, data_pagamento
+	`, pagamentosPorAgendamentoTableName())
+
+	var pagamento models.AgendamentoPagamento
+	err := config.DB.QueryRowContext(
+		ctx,
+		query,
+		agendamentoID,
+		nullableIntValue(input.IDUsuario),
+		input.ValorPago,
+		input.FormaPagamento,
+	).Scan(&pagamento.ID, &pagamento.DataPagamento)
+	if err != nil {
+		return models.AgendamentoPagamento{}, err
+	}
+
+	pagamento.IDAgendamento = agendamentoID
+	pagamento.IDUsuario = input.IDUsuario
+	pagamento.ValorPago = input.ValorPago
+	pagamento.FormaPagamento = input.FormaPagamento
+	return pagamento, nil
+}
+
+func (agendamentoRepository) listPayments(ctx context.Context, agendamentoID int) ([]models.AgendamentoPagamento, error) {
+	query := fmt.Sprintf(`
+		SELECT
+			p.id,
+			p.id_agendamento,
+			p.id_usuario,
+			p.valor_pago,
+			COALESCE(p.forma_pagamento, ''),
+			p.data_pagamento,
+			COALESCE(u.nome, ''),
+			COALESCE(u.sobrenome, ''),
+			COALESCE(u.email, '')
+		FROM %s p
+		LEFT JOIN %s u ON u.id = p.id_usuario
+		WHERE p.id_agendamento = $1
+		ORDER BY p.data_pagamento ASC, p.id ASC
+	`, pagamentosPorAgendamentoTableName(), usuarioJogadorTableName())
+
+	rows, err := config.DB.QueryContext(ctx, query, agendamentoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	pagamentos := make([]models.AgendamentoPagamento, 0)
+	for rows.Next() {
+		var (
+			pagamento models.AgendamentoPagamento
+			idUsuario sql.NullInt64
+		)
+
+		if err := rows.Scan(
+			&pagamento.ID,
+			&pagamento.IDAgendamento,
+			&idUsuario,
+			&pagamento.ValorPago,
+			&pagamento.FormaPagamento,
+			&pagamento.DataPagamento,
+			&pagamento.NomeUsuario,
+			&pagamento.SobrenomeUsuario,
+			&pagamento.EmailUsuario,
+		); err != nil {
+			return nil, err
+		}
+
+		if idUsuario.Valid {
+			value := int(idUsuario.Int64)
+			pagamento.IDUsuario = &value
+		}
+
+		pagamentos = append(pagamentos, pagamento)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return pagamentos, nil
 }
 
 func (agendamentoRepository) sumPayments(ctx context.Context, agendamentoID int) (float64, error) {
@@ -308,7 +469,13 @@ func agendamentoBaseSelectQuery() string {
 			ar.nome AS nome_arena,
 			COALESCE(a.origem_agendamento, 'manual') AS origem_agendamento,
 			COALESCE(a.valor_total, 0),
-			COALESCE(a.valor_restante, 0)
+			COALESCE(a.valor_restante, 0),
+			COALESCE(a.status_de_pagamento, FALSE),
+			a.inicio_cronometro,
+			a.fim_cronometro,
+			COALESCE(a.time1, ''),
+			COALESCE(a.time2, ''),
+			COALESCE(a.modo_de_jogo, '')
 		FROM %s a
 		JOIN %s c ON a.id_campo = c.id_campo
 		JOIN %s ar ON c.id_arena = ar.id
@@ -321,16 +488,22 @@ type agendamentoScanner interface {
 
 func scanAgendamento(scanner agendamentoScanner) (models.Agendamento, error) {
 	var (
-		agendamento   models.Agendamento
-		idUsuario     sql.NullInt64
-		statusRaw     string
-		origemRaw     string
-		criadoEm      sql.NullTime
-		nomeCampo     sql.NullString
-		nomeArena     sql.NullString
-		pagamento     sql.NullString
-		valorTotal    sql.NullFloat64
-		valorRestante sql.NullFloat64
+		agendamento       models.Agendamento
+		idUsuario         sql.NullInt64
+		statusRaw         string
+		origemRaw         string
+		criadoEm          sql.NullTime
+		nomeCampo         sql.NullString
+		nomeArena         sql.NullString
+		pagamento         sql.NullString
+		valorTotal        sql.NullFloat64
+		valorRestante     sql.NullFloat64
+		statusDePagamento sql.NullBool
+		inicioCronometro  sql.NullInt64
+		fimCronometro     sql.NullTime
+		time1             sql.NullString
+		time2             sql.NullString
+		modoDeJogo        sql.NullString
 	)
 
 	err := scanner.Scan(
@@ -349,6 +522,12 @@ func scanAgendamento(scanner agendamentoScanner) (models.Agendamento, error) {
 		&origemRaw,
 		&valorTotal,
 		&valorRestante,
+		&statusDePagamento,
+		&inicioCronometro,
+		&fimCronometro,
+		&time1,
+		&time2,
+		&modoDeJogo,
 	)
 	if err != nil {
 		return models.Agendamento{}, err
@@ -374,6 +553,26 @@ func scanAgendamento(scanner agendamentoScanner) (models.Agendamento, error) {
 	}
 	if valorRestante.Valid {
 		agendamento.ValorRestante = valorRestante.Float64
+	}
+	if statusDePagamento.Valid {
+		agendamento.StatusDePagamento = statusDePagamento.Bool
+	}
+	if inicioCronometro.Valid {
+		value := inicioCronometro.Int64
+		agendamento.InicioCronometro = &value
+	}
+	if fimCronometro.Valid {
+		value := fimCronometro.Time
+		agendamento.FimCronometro = &value
+	}
+	if time1.Valid {
+		agendamento.Time1 = time1.String
+	}
+	if time2.Valid {
+		agendamento.Time2 = time2.String
+	}
+	if modoDeJogo.Valid {
+		agendamento.ModoDeJogo = modoDeJogo.String
 	}
 
 	if normalizedStatus, ok := models.NormalizeAgendamentoStatus(statusRaw); ok {

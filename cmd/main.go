@@ -135,6 +135,12 @@ func main() {
 	authRouter.HandleFunc("/pedidos/{id}/cancelar", handlers.CancelarPedido).Methods("PUT")
 	authRouter.HandleFunc("/agendamentos/status", handlers.AtualizarStatusAgendamento).Methods("PUT")
 	authRouter.HandleFunc("/editar-agendamento", handlers.EditarAgendamento).Methods("PUT")
+	authRouter.HandleFunc("/agendamentos/{id}/iniciar-cronometro", handlers.IniciarCronometroAgendamento).Methods("POST")
+	authRouter.HandleFunc("/agendamentos/{id}/encerrar-cronometro", handlers.EncerrarCronometroAgendamento).Methods("POST")
+	authRouter.HandleFunc("/agendamentos/{id}/pagamentos", handlers.GetPagamentosAgendamento).Methods("GET")
+	authRouter.HandleFunc("/agendamentos/{id}/pagamentos/parcial", handlers.RegistrarPagamentoParcialAgendamento).Methods("POST")
+	authRouter.HandleFunc("/agendamentos/{id}/pagamentos/total", handlers.RegistrarPagamentoTotalAgendamento).Methods("POST")
+	authRouter.HandleFunc("/agendamentos/{id}/concluir", handlers.ConcluirAgendamento).Methods("POST")
 	authRouter.HandleFunc("/dashboard", handlers.GetDashboard).Methods("GET")
 
 	log.Printf("Server running at http://localhost:%s", port)

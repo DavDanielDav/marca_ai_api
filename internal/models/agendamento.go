@@ -16,10 +16,12 @@ const (
 type AgendamentoStatus string
 
 const (
-	AgendamentoStatusPedido    AgendamentoStatus = "pedido"
-	AgendamentoStatusAgendado  AgendamentoStatus = "agendado"
-	AgendamentoStatusCancelado AgendamentoStatus = "cancelado"
-	AgendamentoStatusConcluido AgendamentoStatus = "concluido"
+	AgendamentoStatusPedido              AgendamentoStatus = "pedido"
+	AgendamentoStatusAgendado            AgendamentoStatus = "agendado"
+	AgendamentoStatusEmAndamento         AgendamentoStatus = "em_andamento"
+	AgendamentoStatusAguardandoPagamento AgendamentoStatus = "aguardando_pagamento"
+	AgendamentoStatusCancelado           AgendamentoStatus = "cancelado"
+	AgendamentoStatusConcluido           AgendamentoStatus = "concluido"
 )
 
 type Agendamento struct {
@@ -38,6 +40,9 @@ type Agendamento struct {
 	OrigemAgendamento  AgendamentoOrigem `json:"origem_agendamento"`
 	ValorTotal         float64           `json:"valor_total"`
 	ValorRestante      float64           `json:"valor_restante"`
+	StatusDePagamento  bool              `json:"status_de_pagamento"`
+	InicioCronometro   *int64            `json:"inicio_cronometro,omitempty"`
+	FimCronometro      *time.Time        `json:"fim_cronometro,omitempty"`
 	Time1              string            `json:"time1,omitempty"`
 	Time2              string            `json:"time2,omitempty"`
 	ModoDeJogo         string            `json:"modo_de_jogo,omitempty"`
@@ -76,6 +81,10 @@ func NormalizeAgendamentoStatus(raw string) (AgendamentoStatus, bool) {
 		return AgendamentoStatusPedido, true
 	case string(AgendamentoStatusAgendado):
 		return AgendamentoStatusAgendado, true
+	case string(AgendamentoStatusEmAndamento):
+		return AgendamentoStatusEmAndamento, true
+	case string(AgendamentoStatusAguardandoPagamento):
+		return AgendamentoStatusAguardandoPagamento, true
 	case string(AgendamentoStatusCancelado):
 		return AgendamentoStatusCancelado, true
 	case "concluido", "concluído":
