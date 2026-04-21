@@ -69,6 +69,7 @@ func main() {
 	config.LoadEnv()
 
 	r := mux.NewRouter().StrictSlash(true)
+	r.Use(middleware.DenySensitivePathsMiddleware)
 	allowedOrigins := getAllowedOrigins()
 	log.Printf("CORS allowed origins: %v", allowedOrigins)
 
