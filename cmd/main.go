@@ -107,6 +107,7 @@ func main() {
 	r.HandleFunc("/forgot-password/verify-code", handlers.VerifyForgotPasswordCode).Methods("POST")
 	r.HandleFunc("/forgot-password/reset-password", handlers.ResetForgotPassword).Methods("POST")
 	r.HandleFunc("/arenas", handlers.GetArenasJogador).Methods("GET")
+	r.HandleFunc("/arenas/{id}", handlers.GetArenaJogadorPorID).Methods("GET")
 	r.HandleFunc("/horarios-disponiveis", handlers.GetHorariosDisponiveisCampo).Methods("GET")
 	r.HandleFunc("/integracao/agendamentos", handlers.CriarPedidoAgendamentoJogador).Methods("POST")
 
