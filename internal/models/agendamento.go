@@ -59,6 +59,7 @@ type CreateAgendamentoInput struct {
 	NomeSolicitante   string
 	OrigemAgendamento AgendamentoOrigem
 	IDUsuario         *int
+	IDUsuarioJogador  *int
 	Time1             string
 	Time2             string
 	ModoDeJogo        string

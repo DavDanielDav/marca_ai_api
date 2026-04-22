@@ -207,6 +207,35 @@ func (agendamentoRepository) create(ctx context.Context, input models.CreateAgen
 	return agendamento, nil
 }
 
+func (agendamentoRepository) loadJogadorNomeByID(ctx context.Context, jogadorID int) (string, error) {
+	query := fmt.Sprintf(`
+		SELECT COALESCE(nome, ''), COALESCE(sobrenome, '')
+		FROM %s
+		WHERE id = $1
+	`, usuarioJogadorTableName())
+
+	var nome string
+	var sobrenome string
+	if err := config.DB.QueryRowContext(ctx, query, jogadorID).Scan(&nome, &sobrenome); err != nil {
+		return "", err
+	}
+
+	return buildNomeCompleto(nome, sobrenome), nil
+}
+
+func buildNomeCompleto(nome string, sobrenome string) string {
+	parts := make([]string, 0, 2)
+
+	if nome = strings.TrimSpace(nome); nome != "" {
+		parts = append(parts, nome)
+	}
+	if sobrenome = strings.TrimSpace(sobrenome); sobrenome != "" {
+		parts = append(parts, sobrenome)
+	}
+
+	return strings.Join(parts, " ")
+}
+
 func (repository agendamentoRepository) listByOwner(ctx context.Context, ownerUserID int, status *models.AgendamentoStatus) ([]models.Agendamento, error) {
 	where := []string{"ar.id_usuario = $1"}
 	args := []any{ownerUserID}

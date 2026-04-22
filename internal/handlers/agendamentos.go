@@ -22,6 +22,9 @@ type agendamentoCreateRequest struct {
 	Jogadores         int    `json:"jogadores"`
 	Pagamento         string `json:"pagamento"`
 	Pago              bool   `json:"pago"`
+	IDUsuarioJogador  *int   `json:"id_usuario_jogador"`
+	IDJogador         *int   `json:"id_jogador"`
+	IDUsuario         *int   `json:"id_usuario"`
 	NomeSolicitante   string `json:"nome_solicitante"`
 	OrigemAgendamento string `json:"origem_agendamento"`
 	Origem            string `json:"origem"`
@@ -489,12 +492,17 @@ func parseAgendamentoCreateRequest(r *http.Request) (models.CreateAgendamentoInp
 		return models.CreateAgendamentoInput{}, errors.New("Formato de horario invalido")
 	}
 
+	jogadorID, err := resolveAgendamentoJogadorID(request)
+	if err != nil {
+		return models.CreateAgendamentoInput{}, err
+	}
+
 	origemRaw := strings.TrimSpace(request.OrigemAgendamento)
 	if origemRaw == "" {
 		origemRaw = strings.TrimSpace(request.Origem)
 	}
 
-	origem := models.AgendamentoOrigemManual
+	var origem models.AgendamentoOrigem
 	if origemRaw != "" {
 		normalizedOrigem, ok := models.NormalizeAgendamentoOrigem(origemRaw)
 		if !ok {
@@ -509,12 +517,31 @@ func parseAgendamentoCreateRequest(r *http.Request) (models.CreateAgendamentoInp
 		Jogadores:         request.Jogadores,
 		Pagamento:         strings.TrimSpace(request.Pagamento),
 		Pago:              request.Pago,
+		IDUsuarioJogador:  jogadorID,
 		NomeSolicitante:   strings.TrimSpace(request.NomeSolicitante),
 		OrigemAgendamento: origem,
 		Time1:             strings.TrimSpace(request.Time1),
 		Time2:             strings.TrimSpace(request.Time2),
 		ModoDeJogo:        strings.TrimSpace(request.ModoDeJogo),
 	}, nil
+}
+
+func resolveAgendamentoJogadorID(request agendamentoCreateRequest) (*int, error) {
+	candidates := []*int{request.IDUsuarioJogador, request.IDJogador, request.IDUsuario}
+
+	for _, candidate := range candidates {
+		if candidate == nil {
+			continue
+		}
+		if *candidate <= 0 {
+			return nil, errors.New("ID do jogador invalido")
+		}
+
+		jogadorID := *candidate
+		return &jogadorID, nil
+	}
+
+	return nil, nil
 }
 
 func parsePagamentoAgendamentoRequest(r *http.Request) (models.RegistrarPagamentoInput, error) {
@@ -673,6 +700,8 @@ func writeAgendamentoServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, errAgendamentoCampoNaoEncontrado):
 		http.Error(w, "Campo nao encontrado", http.StatusNotFound)
+	case errors.Is(err, errAgendamentoJogadorNaoEncontrado):
+		http.Error(w, "Jogador nao encontrado", http.StatusNotFound)
 	case errors.Is(err, errAgendamentoNaoEncontrado):
 		http.Error(w, "Agendamento nao encontrado", http.StatusNotFound)
 	case errors.Is(err, errAgendamentoCampoSemPermissao):

@@ -13,6 +13,7 @@ var (
 	errAgendamentoCampoNaoEncontrado     = errors.New("campo nao encontrado")
 	errAgendamentoCampoSemPermissao      = errors.New("campo nao pertence ao usuario")
 	errAgendamentoNaoEncontrado          = errors.New("agendamento nao encontrado")
+	errAgendamentoJogadorNaoEncontrado   = errors.New("jogador nao encontrado")
 	errAgendamentoOrigemInvalida         = errors.New("origem do agendamento invalida")
 	errAgendamentoStatusInvalido         = errors.New("status do agendamento invalido")
 	errAgendamentoHorarioIndisponivel    = errors.New("horario indisponivel")
@@ -65,6 +66,14 @@ func (service agendamentoService) CreatePedidoExterno(ctx context.Context, input
 	}
 
 	input.IDUsuario = nil
+	input, err := resolveNomeSolicitanteFromJogador(ctx, input, service.repository.loadJogadorNomeByID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.Agendamento{}, errAgendamentoJogadorNaoEncontrado
+		}
+		return models.Agendamento{}, err
+	}
+
 	return service.create(ctx, input, 0, models.AgendamentoStatusPedido)
 }
 
@@ -411,6 +420,26 @@ func (service agendamentoService) create(ctx context.Context, input models.Creat
 	agendamento.Pago = pago
 	agendamento.StatusDePagamento = statusDePagamento
 	return agendamento, nil
+}
+
+func resolveNomeSolicitanteFromJogador(
+	ctx context.Context,
+	input models.CreateAgendamentoInput,
+	loadJogadorNome func(context.Context, int) (string, error),
+) (models.CreateAgendamentoInput, error) {
+	if input.OrigemAgendamento != models.AgendamentoOrigemJogador || input.IDUsuarioJogador == nil {
+		return input, nil
+	}
+
+	nomeSolicitante, err := loadJogadorNome(ctx, *input.IDUsuarioJogador)
+	if err != nil {
+		return models.CreateAgendamentoInput{}, err
+	}
+	if nomeSolicitante != "" {
+		input.NomeSolicitante = nomeSolicitante
+	}
+
+	return input, nil
 }
 
 func (service agendamentoService) validateCampoAndSchedule(ctx context.Context, input models.CreateAgendamentoInput, ownerUserID int, excludeAgendamentoID *int) (campoAgendamentoSnapshot, error) {
