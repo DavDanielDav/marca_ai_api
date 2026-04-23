@@ -1,0 +1,8 @@
+./agendamento.go
+./agendamento_pagamento.go
+./arenas.go
+./campo.go
+./email_code.go
+./user.go
+./agendamento_test.go
+./arenas_test.go

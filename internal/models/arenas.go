@@ -8,9 +8,9 @@ type Arenas struct {
 	Tipo               string  `json:"tipo"`
 	Imagem             string  `json:"imagem"`
 	Endereco           string  `json:"endereco"`
-	Observacoes        string  `json:"observacoes,omitempty"`
-	EsportesOferecidos string  `json:"esportes_oferecidos,omitempty"`
-	InformacoesArena   string  `json:"informacoes_arena,omitempty"`
+	Observacoes        string  `json:"observacoes"`
+	EsportesOferecidos string  `json:"esportes_oferecidos"`
+	InformacoesArena   string  `json:"informacoes_arena"`
 	EmManutencao       bool    `json:"em_manutencao"`
 	Campos             []Campo `json:"campos,omitempty"`
 }
