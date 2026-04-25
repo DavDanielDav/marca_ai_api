@@ -23,6 +23,7 @@ func defaultAllowedOrigins() []string {
 		"https://frontend-marcaai.onrender.com",
 		"https://www.arenas.marcaai.tec.br",
 		"https://arenas.marcaai.tec.br",
+		"http://localhost:5000",
 	}
 }
 
