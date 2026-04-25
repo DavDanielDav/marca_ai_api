@@ -17,6 +17,7 @@ import (
 func defaultAllowedOrigins() []string {
 	return []string{
 		"http://localhost:*",
+		"http://localhost:5000",
 		"https://*.onrender.com",
 		"http://10.0.50.7:5173",
 		"https://*.brs.devtunnels.ms",
