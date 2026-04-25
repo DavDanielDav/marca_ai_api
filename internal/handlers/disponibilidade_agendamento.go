@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/danpi/marca_ai_backend/internal/config"
+	"github.com/gorilla/mux"
 )
 
 type campoDisponibilidadeInfo struct {
@@ -46,6 +47,16 @@ type horarioDisponivelResponse struct {
 
 func GetHorariosDisponiveisCampo(w http.ResponseWriter, r *http.Request) {
 	campoIDStr := strings.TrimSpace(r.URL.Query().Get("campo_id"))
+	if campoIDStr == "" {
+		campoIDStr = strings.TrimSpace(r.URL.Query().Get("id_campo"))
+	}
+	if campoIDStr == "" {
+		campoIDStr = strings.TrimSpace(mux.Vars(r)["campo_id"])
+	}
+	if campoIDStr == "" {
+		campoIDStr = strings.TrimSpace(mux.Vars(r)["id_campo"])
+	}
+
 	if campoIDStr == "" {
 		http.Error(w, "campo_id e obrigatorio", http.StatusBadRequest)
 		return

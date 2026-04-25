@@ -110,6 +110,8 @@ func main() {
 	r.HandleFunc("/arenas", handlers.GetArenasJogador).Methods("GET")
 	r.HandleFunc("/arenas/{id}", handlers.GetArenaJogadorPorID).Methods("GET")
 	r.HandleFunc("/horarios-disponiveis", handlers.GetHorariosDisponiveisCampo).Methods("GET")
+	r.HandleFunc("/horarios-disponiveis/{campo_id}", handlers.GetHorariosDisponiveisCampo).Methods("GET")
+	r.HandleFunc("/horarios-disponiveis/id-campo/{id_campo}", handlers.GetHorariosDisponiveisCampo).Methods("GET")
 	r.HandleFunc("/integracao/agendamentos", handlers.CriarPedidoAgendamentoJogador).Methods("POST")
 
 	authRouter := r.PathPrefix("").Subrouter()
