@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -122,6 +124,8 @@ func AgendarCampo(w http.ResponseWriter, r *http.Request) {
 }
 
 func CriarPedidoAgendamentoJogador(w http.ResponseWriter, r *http.Request) {
+	logJogadorIntegrationRequest(r)
+
 	if err := validateJogadorIntegrationRequest(r); err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -148,6 +152,32 @@ func CriarPedidoAgendamentoJogador(w http.ResponseWriter, r *http.Request) {
 		"message":     "Pedido de agendamento recebido com sucesso",
 		"agendamento": newAgendamentoResponse(agendamento),
 	})
+}
+
+func logJogadorIntegrationRequest(r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Pedido jogador recebido: method=%s path=%s query=%s origin=%s content_type=%s body_read_error=%v",
+			r.Method,
+			r.URL.Path,
+			r.URL.RawQuery,
+			r.Header.Get("Origin"),
+			r.Header.Get("Content-Type"),
+			err,
+		)
+		return
+	}
+
+	r.Body = io.NopCloser(bytes.NewReader(body))
+
+	log.Printf("Pedido jogador recebido: method=%s path=%s query=%s origin=%s content_type=%s body=%s",
+		r.Method,
+		r.URL.Path,
+		r.URL.RawQuery,
+		r.Header.Get("Origin"),
+		r.Header.Get("Content-Type"),
+		string(body),
+	)
 }
 
 func GetAgendamentos(w http.ResponseWriter, r *http.Request) {
