@@ -476,7 +476,63 @@ func handlePagamentoAgendamento(w http.ResponseWriter, r *http.Request, pagament
 func parseAgendamentoCreateRequest(r *http.Request) (models.CreateAgendamentoInput, error) {
 	var request agendamentoCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		return models.CreateAgendamentoInput{}, errors.New("Erro ao decodificar JSON")
+		if errors.Is(err, io.EOF) {
+			request = agendamentoCreateRequestFromQuery(r)
+		} else {
+			return models.CreateAgendamentoInput{}, errors.New("Erro ao decodificar JSON")
+		}
+	}
+
+	if request.CampoID <= 0 && request.IDCampo <= 0 {
+		queryRequest := agendamentoCreateRequestFromQuery(r)
+		request.CampoID = queryRequest.CampoID
+		request.IDCampo = queryRequest.IDCampo
+	}
+
+	if request.Horario == "" {
+		request.Horario = strings.TrimSpace(r.URL.Query().Get("horario"))
+	}
+
+	if request.Jogadores <= 0 {
+		request.Jogadores, _ = strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("jogadores")))
+	}
+
+	if request.NomeSolicitante == "" {
+		request.NomeSolicitante = strings.TrimSpace(r.URL.Query().Get("nome_solicitante"))
+	}
+
+	if request.Pagamento == "" {
+		request.Pagamento = strings.TrimSpace(r.URL.Query().Get("pagamento"))
+	}
+
+	if !request.Pago {
+		request.Pago, _ = strconv.ParseBool(strings.TrimSpace(r.URL.Query().Get("pago")))
+	}
+
+	if request.IDUsuarioJogador == nil && request.IDJogador == nil && request.IDUsuario == nil {
+		request.IDUsuarioJogador = optionalPositiveIntFromQuery(r, "id_usuario_jogador")
+		request.IDJogador = optionalPositiveIntFromQuery(r, "id_jogador")
+		request.IDUsuario = optionalPositiveIntFromQuery(r, "id_usuario")
+	}
+
+	if request.OrigemAgendamento == "" {
+		request.OrigemAgendamento = strings.TrimSpace(r.URL.Query().Get("origem_agendamento"))
+	}
+
+	if request.Origem == "" {
+		request.Origem = strings.TrimSpace(r.URL.Query().Get("origem"))
+	}
+
+	if request.Time1 == "" {
+		request.Time1 = strings.TrimSpace(r.URL.Query().Get("time1"))
+	}
+
+	if request.Time2 == "" {
+		request.Time2 = strings.TrimSpace(r.URL.Query().Get("time2"))
+	}
+
+	if request.ModoDeJogo == "" {
+		request.ModoDeJogo = strings.TrimSpace(r.URL.Query().Get("modo_de_jogo"))
 	}
 
 	campoID := request.CampoID
@@ -524,6 +580,41 @@ func parseAgendamentoCreateRequest(r *http.Request) (models.CreateAgendamentoInp
 		Time2:             strings.TrimSpace(request.Time2),
 		ModoDeJogo:        strings.TrimSpace(request.ModoDeJogo),
 	}, nil
+}
+
+func agendamentoCreateRequestFromQuery(r *http.Request) agendamentoCreateRequest {
+	query := r.URL.Query()
+	campoID, _ := strconv.Atoi(strings.TrimSpace(query.Get("campo_id")))
+	idCampo, _ := strconv.Atoi(strings.TrimSpace(query.Get("id_campo")))
+	jogadores, _ := strconv.Atoi(strings.TrimSpace(query.Get("jogadores")))
+	pago, _ := strconv.ParseBool(strings.TrimSpace(query.Get("pago")))
+
+	return agendamentoCreateRequest{
+		CampoID:           campoID,
+		IDCampo:           idCampo,
+		Horario:           strings.TrimSpace(query.Get("horario")),
+		Jogadores:         jogadores,
+		Pagamento:         strings.TrimSpace(query.Get("pagamento")),
+		Pago:              pago,
+		IDUsuarioJogador:  optionalPositiveIntFromQuery(r, "id_usuario_jogador"),
+		IDJogador:         optionalPositiveIntFromQuery(r, "id_jogador"),
+		IDUsuario:         optionalPositiveIntFromQuery(r, "id_usuario"),
+		NomeSolicitante:   strings.TrimSpace(query.Get("nome_solicitante")),
+		OrigemAgendamento: strings.TrimSpace(query.Get("origem_agendamento")),
+		Origem:            strings.TrimSpace(query.Get("origem")),
+		Time1:             strings.TrimSpace(query.Get("time1")),
+		Time2:             strings.TrimSpace(query.Get("time2")),
+		ModoDeJogo:        strings.TrimSpace(query.Get("modo_de_jogo")),
+	}
+}
+
+func optionalPositiveIntFromQuery(r *http.Request, key string) *int {
+	value, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get(key)))
+	if err != nil || value <= 0 {
+		return nil
+	}
+
+	return &value
 }
 
 func resolveAgendamentoJogadorID(request agendamentoCreateRequest) (*int, error) {

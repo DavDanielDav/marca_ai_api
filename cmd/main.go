@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -24,7 +25,6 @@ func defaultAllowedOrigins() []string {
 		"https://frontend-marcaai.onrender.com",
 		"https://www.arenas.marcaai.tec.br",
 		"https://arenas.marcaai.tec.br",
-		"http://localhost:5000",
 	}
 }
 
@@ -67,6 +67,67 @@ func getAllowedOrigins() []string {
 	return origins
 }
 
+func isAllowedOrigin(origin string, allowedOrigins []string) bool {
+	origin = strings.TrimRight(strings.TrimSpace(origin), "/")
+	if origin == "" {
+		return false
+	}
+
+	if isLocalDevelopmentOrigin(origin) {
+		return true
+	}
+
+	for _, allowedOrigin := range allowedOrigins {
+		if origin == allowedOrigin || wildcardOriginMatches(allowedOrigin, origin) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isLocalDevelopmentOrigin(origin string) bool {
+	parsedOrigin, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+
+	if parsedOrigin.Scheme != "http" {
+		return false
+	}
+
+	host := parsedOrigin.Hostname()
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
+}
+
+func wildcardOriginMatches(pattern string, origin string) bool {
+	if !strings.Contains(pattern, "*") {
+		return false
+	}
+
+	patternParts := strings.SplitN(pattern, "://", 2)
+	if len(patternParts) != 2 {
+		return false
+	}
+
+	parsedOrigin, err := url.Parse(origin)
+	if err != nil || parsedOrigin.Scheme != patternParts[0] {
+		return false
+	}
+
+	hostPattern := patternParts[1]
+	if strings.HasSuffix(hostPattern, ":*") {
+		return parsedOrigin.Hostname() == strings.TrimSuffix(hostPattern, ":*")
+	}
+
+	if strings.HasPrefix(hostPattern, "*.") {
+		suffix := strings.TrimPrefix(hostPattern, "*.")
+		return strings.HasSuffix(parsedOrigin.Hostname(), "."+suffix)
+	}
+
+	return false
+}
+
 func main() {
 	config.LoadEnv()
 
@@ -76,9 +137,9 @@ func main() {
 	log.Printf("CORS allowed origins: %v", allowedOrigins)
 
 	c := cors.New(cors.Options{
-		AllowedOrigins:   allowedOrigins,
+		AllowOriginFunc:  func(origin string) bool { return isAllowedOrigin(origin, allowedOrigins) },
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Requested-With", "X-Integration-Token"},
 		AllowCredentials: true,
 	})
 
