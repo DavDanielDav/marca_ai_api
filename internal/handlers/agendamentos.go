@@ -506,7 +506,7 @@ func handlePagamentoAgendamento(w http.ResponseWriter, r *http.Request, pagament
 func parseAgendamentoCreateRequest(r *http.Request) (models.CreateAgendamentoInput, error) {
 	var request agendamentoCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		if errors.Is(err, io.EOF) {
+		if errors.Is(err, io.EOF) || hasAgendamentoCreateQueryParams(r) {
 			request = agendamentoCreateRequestFromQuery(r)
 		} else {
 			return models.CreateAgendamentoInput{}, errors.New("Erro ao decodificar JSON")
@@ -636,6 +636,35 @@ func agendamentoCreateRequestFromQuery(r *http.Request) agendamentoCreateRequest
 		Time2:             strings.TrimSpace(query.Get("time2")),
 		ModoDeJogo:        strings.TrimSpace(query.Get("modo_de_jogo")),
 	}
+}
+
+func hasAgendamentoCreateQueryParams(r *http.Request) bool {
+	query := r.URL.Query()
+	keys := []string{
+		"campo_id",
+		"id_campo",
+		"horario",
+		"jogadores",
+		"nome_solicitante",
+		"pagamento",
+		"pago",
+		"id_usuario_jogador",
+		"id_jogador",
+		"id_usuario",
+		"origem_agendamento",
+		"origem",
+		"time1",
+		"time2",
+		"modo_de_jogo",
+	}
+
+	for _, key := range keys {
+		if strings.TrimSpace(query.Get(key)) != "" {
+			return true
+		}
+	}
+
+	return false
 }
 
 func optionalPositiveIntFromQuery(r *http.Request, key string) *int {
