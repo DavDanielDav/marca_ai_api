@@ -61,6 +61,25 @@ func TestParseAgendamentoCreateRequestSupportsJogadorIDAliases(t *testing.T) {
 	}
 }
 
+func TestParseAgendamentoCreateRequestAcceptsStringCampoID(t *testing.T) {
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/integracao/agendamentos",
+		strings.NewReader(`{"id_campo":"3","horario":"2026-04-28T18:00","jogadores":"10"}`),
+	)
+
+	input, err := parseAgendamentoCreateRequest(request)
+	if err != nil {
+		t.Fatalf("parseAgendamentoCreateRequest returned error: %v", err)
+	}
+	if input.IDCampo != 3 {
+		t.Fatalf("expected IDCampo 3, got %d", input.IDCampo)
+	}
+	if input.Jogadores != 10 {
+		t.Fatalf("expected Jogadores 10, got %d", input.Jogadores)
+	}
+}
+
 func TestParseAgendamentoCreateRequestRejectsInvalidJogadorID(t *testing.T) {
 	request := httptest.NewRequest(
 		http.MethodPost,

@@ -18,21 +18,21 @@ import (
 )
 
 type agendamentoCreateRequest struct {
-	CampoID           int    `json:"campo_id"`
-	IDCampo           int    `json:"id_campo"`
-	Horario           string `json:"horario"`
-	Jogadores         int    `json:"jogadores"`
-	Pagamento         string `json:"pagamento"`
-	Pago              bool   `json:"pago"`
-	IDUsuarioJogador  *int   `json:"id_usuario_jogador"`
-	IDJogador         *int   `json:"id_jogador"`
-	IDUsuario         *int   `json:"id_usuario"`
-	NomeSolicitante   string `json:"nome_solicitante"`
-	OrigemAgendamento string `json:"origem_agendamento"`
-	Origem            string `json:"origem"`
-	Time1             string `json:"time1"`
-	Time2             string `json:"time2"`
-	ModoDeJogo        string `json:"modo_de_jogo"`
+	CampoID           agendamentoInt `json:"campo_id"`
+	IDCampo           agendamentoInt `json:"id_campo"`
+	Horario           string         `json:"horario"`
+	Jogadores         agendamentoInt `json:"jogadores"`
+	Pagamento         string         `json:"pagamento"`
+	Pago              bool           `json:"pago"`
+	IDUsuarioJogador  *int           `json:"id_usuario_jogador"`
+	IDJogador         *int           `json:"id_jogador"`
+	IDUsuario         *int           `json:"id_usuario"`
+	NomeSolicitante   string         `json:"nome_solicitante"`
+	OrigemAgendamento string         `json:"origem_agendamento"`
+	Origem            string         `json:"origem"`
+	Time1             string         `json:"time1"`
+	Time2             string         `json:"time2"`
+	ModoDeJogo        string         `json:"modo_de_jogo"`
 }
 
 type agendamentoStatusRequest struct {
@@ -81,6 +81,42 @@ type agendamentoPagamentoResponse struct {
 	NomeUsuario      string  `json:"nome_usuario,omitempty"`
 	SobrenomeUsuario string  `json:"sobrenome_usuario,omitempty"`
 	EmailUsuario     string  `json:"email_usuario,omitempty"`
+}
+
+type agendamentoInt int
+
+func (value *agendamentoInt) UnmarshalJSON(data []byte) error {
+	raw := strings.TrimSpace(string(data))
+	if raw == "" || raw == "null" {
+		*value = 0
+		return nil
+	}
+
+	var parsed int
+	if raw[0] == '"' {
+		var text string
+		if err := json.Unmarshal(data, &text); err != nil {
+			return err
+		}
+		text = strings.TrimSpace(text)
+		if text == "" {
+			*value = 0
+			return nil
+		}
+
+		number, err := strconv.Atoi(text)
+		if err != nil {
+			return err
+		}
+		parsed = number
+	} else {
+		if err := json.Unmarshal(data, &parsed); err != nil {
+			return err
+		}
+	}
+
+	*value = agendamentoInt(parsed)
+	return nil
 }
 
 type agendamentoPagamentosResumoResponse struct {
@@ -524,7 +560,8 @@ func parseAgendamentoCreateRequest(r *http.Request) (models.CreateAgendamentoInp
 	}
 
 	if request.Jogadores <= 0 {
-		request.Jogadores, _ = strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("jogadores")))
+		jogadores, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("jogadores")))
+		request.Jogadores = agendamentoInt(jogadores)
 	}
 
 	if request.NomeSolicitante == "" {
@@ -598,9 +635,9 @@ func parseAgendamentoCreateRequest(r *http.Request) (models.CreateAgendamentoInp
 	}
 
 	return models.CreateAgendamentoInput{
-		IDCampo:           campoID,
+		IDCampo:           int(campoID),
 		Horario:           horario,
-		Jogadores:         request.Jogadores,
+		Jogadores:         int(request.Jogadores),
 		Pagamento:         strings.TrimSpace(request.Pagamento),
 		Pago:              request.Pago,
 		IDUsuarioJogador:  jogadorID,
@@ -620,10 +657,10 @@ func agendamentoCreateRequestFromQuery(r *http.Request) agendamentoCreateRequest
 	pago, _ := strconv.ParseBool(strings.TrimSpace(query.Get("pago")))
 
 	return agendamentoCreateRequest{
-		CampoID:           campoID,
-		IDCampo:           idCampo,
+		CampoID:           agendamentoInt(campoID),
+		IDCampo:           agendamentoInt(idCampo),
 		Horario:           strings.TrimSpace(query.Get("horario")),
-		Jogadores:         jogadores,
+		Jogadores:         agendamentoInt(jogadores),
 		Pagamento:         strings.TrimSpace(query.Get("pagamento")),
 		Pago:              pago,
 		IDUsuarioJogador:  optionalPositiveIntFromQuery(r, "id_usuario_jogador"),
