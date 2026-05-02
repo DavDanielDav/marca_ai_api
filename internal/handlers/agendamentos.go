@@ -20,6 +20,8 @@ import (
 type agendamentoCreateRequest struct {
 	CampoID           agendamentoInt `json:"campo_id"`
 	IDCampo           agendamentoInt `json:"id_campo"`
+	CampoIDCamel      agendamentoInt `json:"campoId"`
+	IDCampoCamel      agendamentoInt `json:"idCampo"`
 	Horario           string         `json:"horario"`
 	Jogadores         agendamentoInt `json:"jogadores"`
 	Pagamento         string         `json:"pagamento"`
@@ -549,10 +551,12 @@ func parseAgendamentoCreateRequest(r *http.Request) (models.CreateAgendamentoInp
 		}
 	}
 
-	if request.CampoID <= 0 && request.IDCampo <= 0 {
+	if request.CampoID <= 0 && request.IDCampo <= 0 && request.CampoIDCamel <= 0 && request.IDCampoCamel <= 0 {
 		queryRequest := agendamentoCreateRequestFromQuery(r)
 		request.CampoID = queryRequest.CampoID
 		request.IDCampo = queryRequest.IDCampo
+		request.CampoIDCamel = queryRequest.CampoIDCamel
+		request.IDCampoCamel = queryRequest.IDCampoCamel
 	}
 
 	if request.Horario == "" {
@@ -607,6 +611,12 @@ func parseAgendamentoCreateRequest(r *http.Request) (models.CreateAgendamentoInp
 		campoID = request.IDCampo
 	}
 	if campoID <= 0 {
+		campoID = request.CampoIDCamel
+	}
+	if campoID <= 0 {
+		campoID = request.IDCampoCamel
+	}
+	if campoID <= 0 {
 		return models.CreateAgendamentoInput{}, errors.New("Campo e obrigatorio")
 	}
 
@@ -653,12 +663,16 @@ func agendamentoCreateRequestFromQuery(r *http.Request) agendamentoCreateRequest
 	query := r.URL.Query()
 	campoID, _ := strconv.Atoi(strings.TrimSpace(query.Get("campo_id")))
 	idCampo, _ := strconv.Atoi(strings.TrimSpace(query.Get("id_campo")))
+	campoIDCamel, _ := strconv.Atoi(strings.TrimSpace(query.Get("campoId")))
+	idCampoCamel, _ := strconv.Atoi(strings.TrimSpace(query.Get("idCampo")))
 	jogadores, _ := strconv.Atoi(strings.TrimSpace(query.Get("jogadores")))
 	pago, _ := strconv.ParseBool(strings.TrimSpace(query.Get("pago")))
 
 	return agendamentoCreateRequest{
 		CampoID:           agendamentoInt(campoID),
 		IDCampo:           agendamentoInt(idCampo),
+		CampoIDCamel:      agendamentoInt(campoIDCamel),
+		IDCampoCamel:      agendamentoInt(idCampoCamel),
 		Horario:           strings.TrimSpace(query.Get("horario")),
 		Jogadores:         agendamentoInt(jogadores),
 		Pagamento:         strings.TrimSpace(query.Get("pagamento")),
@@ -680,6 +694,8 @@ func hasAgendamentoCreateQueryParams(r *http.Request) bool {
 	keys := []string{
 		"campo_id",
 		"id_campo",
+		"campoId",
+		"idCampo",
 		"horario",
 		"jogadores",
 		"nome_solicitante",

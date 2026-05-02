@@ -80,6 +80,49 @@ func TestParseAgendamentoCreateRequestAcceptsStringCampoID(t *testing.T) {
 	}
 }
 
+func TestParseAgendamentoCreateRequestSupportsCampoIDAliases(t *testing.T) {
+	testCases := []struct {
+		name string
+		url  string
+		body string
+	}{
+		{
+			name: "id_campo",
+			url:  "/integracao/agendamentos",
+			body: `{"id_campo":3,"horario":"2026-04-28T18:00","jogadores":10}`,
+		},
+		{
+			name: "idCampo",
+			url:  "/integracao/agendamentos",
+			body: `{"idCampo":4,"horario":"2026-04-28T18:00","jogadores":10}`,
+		},
+		{
+			name: "campoId query",
+			url:  "/integracao/agendamentos?campoId=5&horario=2026-04-28T18:00&jogadores=10",
+			body: ``,
+		},
+		{
+			name: "idCampo query",
+			url:  "/integracao/agendamentos?idCampo=6&horario=2026-04-28T18:00&jogadores=10",
+			body: ``,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, testCase.url, strings.NewReader(testCase.body))
+
+			input, err := parseAgendamentoCreateRequest(request)
+			if err != nil {
+				t.Fatalf("parseAgendamentoCreateRequest returned error: %v", err)
+			}
+			if input.IDCampo <= 0 {
+				t.Fatalf("expected IDCampo to be filled, got %d", input.IDCampo)
+			}
+		})
+	}
+}
+
 func TestParseAgendamentoCreateRequestRejectsInvalidJogadorID(t *testing.T) {
 	request := httptest.NewRequest(
 		http.MethodPost,
