@@ -29,6 +29,7 @@ type agendamentoCreateRequest struct {
 	IDUsuarioJogador  *int           `json:"id_usuario_jogador"`
 	IDJogador         *int           `json:"id_jogador"`
 	IDUsuario         *int           `json:"id_usuario"`
+	Identity          *int           `json:"identity"`
 	NomeSolicitante   string         `json:"nome_solicitante"`
 	OrigemAgendamento string         `json:"origem_agendamento"`
 	Origem            string         `json:"origem"`
@@ -580,10 +581,11 @@ func parseAgendamentoCreateRequest(r *http.Request) (models.CreateAgendamentoInp
 		request.Pago, _ = strconv.ParseBool(strings.TrimSpace(r.URL.Query().Get("pago")))
 	}
 
-	if request.IDUsuarioJogador == nil && request.IDJogador == nil && request.IDUsuario == nil {
+	if request.IDUsuarioJogador == nil && request.IDJogador == nil && request.IDUsuario == nil && request.Identity == nil {
 		request.IDUsuarioJogador = optionalPositiveIntFromQuery(r, "id_usuario_jogador")
 		request.IDJogador = optionalPositiveIntFromQuery(r, "id_jogador")
 		request.IDUsuario = optionalPositiveIntFromQuery(r, "id_usuario")
+		request.Identity = optionalPositiveIntFromQuery(r, "identity")
 	}
 
 	if request.OrigemAgendamento == "" {
@@ -680,6 +682,7 @@ func agendamentoCreateRequestFromQuery(r *http.Request) agendamentoCreateRequest
 		IDUsuarioJogador:  optionalPositiveIntFromQuery(r, "id_usuario_jogador"),
 		IDJogador:         optionalPositiveIntFromQuery(r, "id_jogador"),
 		IDUsuario:         optionalPositiveIntFromQuery(r, "id_usuario"),
+		Identity:          optionalPositiveIntFromQuery(r, "identity"),
 		NomeSolicitante:   strings.TrimSpace(query.Get("nome_solicitante")),
 		OrigemAgendamento: strings.TrimSpace(query.Get("origem_agendamento")),
 		Origem:            strings.TrimSpace(query.Get("origem")),
@@ -704,6 +707,7 @@ func hasAgendamentoCreateQueryParams(r *http.Request) bool {
 		"id_usuario_jogador",
 		"id_jogador",
 		"id_usuario",
+		"identity",
 		"origem_agendamento",
 		"origem",
 		"time1",
@@ -730,7 +734,7 @@ func optionalPositiveIntFromQuery(r *http.Request, key string) *int {
 }
 
 func resolveAgendamentoJogadorID(request agendamentoCreateRequest) (*int, error) {
-	candidates := []*int{request.IDUsuarioJogador, request.IDJogador, request.IDUsuario}
+	candidates := []*int{request.Identity, request.IDUsuarioJogador, request.IDJogador, request.IDUsuario}
 
 	for _, candidate := range candidates {
 		if candidate == nil {

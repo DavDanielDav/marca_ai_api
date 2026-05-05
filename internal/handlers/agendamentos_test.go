@@ -41,6 +41,11 @@ func TestParseAgendamentoCreateRequestSupportsJogadorIDAliases(t *testing.T) {
 			body:       `{"campo_id":1,"horario":"2026-04-22T17:00","jogadores":10,"id_usuario":34}`,
 			expectedID: 34,
 		},
+		{
+			name:       "identity",
+			body:       `{"campo_id":1,"horario":"2026-04-22T17:00","jogadores":10,"identity":7}`,
+			expectedID: 7,
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -77,6 +82,25 @@ func TestParseAgendamentoCreateRequestAcceptsStringCampoID(t *testing.T) {
 	}
 	if input.Jogadores != 10 {
 		t.Fatalf("expected Jogadores 10, got %d", input.Jogadores)
+	}
+}
+
+func TestParseAgendamentoCreateRequestPrefersIdentityAsJogadorID(t *testing.T) {
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/integracao/agendamentos",
+		strings.NewReader(`{"campo_id":1,"horario":"2026-04-22T17:00","jogadores":10,"identity":7,"id_usuario":34}`),
+	)
+
+	input, err := parseAgendamentoCreateRequest(request)
+	if err != nil {
+		t.Fatalf("parseAgendamentoCreateRequest returned error: %v", err)
+	}
+	if input.IDUsuarioJogador == nil {
+		t.Fatal("expected IDUsuarioJogador to be filled")
+	}
+	if *input.IDUsuarioJogador != 7 {
+		t.Fatalf("expected identity to be used as jogador id, got %d", *input.IDUsuarioJogador)
 	}
 }
 
